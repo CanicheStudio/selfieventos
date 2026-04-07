@@ -1,13 +1,17 @@
 /**
  * selfie-sheets-live.js
  * Fetch eventos activos (activo=SI) desde Google Sheets (CSV).
- * Si hay uno activo, inserta una sección "En Vivo" justo después del hero.
+ * Si hay uno activo, muestra la sección #section_eventos-en-vivo y llena los datos.
+ * Si no hay evento activo, oculta la sección.
  */
 (function () {
   'use strict';
 
   var CSV_URL =
     'https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhU1olZb4klwB2qK-lxDn6FN-3RIRFkjZ5IDHedKw_MthNOdfV3dlvu__izfFLupRgcegFM2JUpDM/pub?gid=0&single=true&output=csv';
+
+  var DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTT1ggtYTqj9MAhMTG8mQPmga1FMmzSiump-LAZrF6VPbpve8g3Zo4XzVzPksLchZpDQ/exec';
+  var DRIVE_FOLDER_ID = '1J5qvFBJWX__2eYnlNFzBXN4qlieQr44U';
 
   function parseCSV(text) {
     var rows = [];
@@ -66,105 +70,112 @@
     return results;
   }
 
-  function escapeHtml(str) {
-    var div = document.createElement('div');
-    div.appendChild(document.createTextNode(str));
-    return div.innerHTML;
-  }
-
   function formatDate(dateStr) {
     if (!dateStr) return '';
-    var d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('es-AR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
+    var parts = dateStr.split('-');
+    if (parts.length === 3) {
+      var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      if (isNaN(d.getTime())) return dateStr;
+      return d.toLocaleDateString('es-AR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+    }
+    return dateStr;
   }
 
-  function buildLiveSection(evento) {
-    var section = document.createElement('section');
-    section.id = 'section_en-vivo';
-    section.className = 'u-section';
-    section.setAttribute('data-wf--section--variant', 'dark');
+  function fillLiveSection(evento) {
+    var section = document.getElementById('section_eventos-en-vivo');
+    if (!section) return;
 
     var nombre = evento.nombre || 'Evento en vivo';
     var lugar = evento.lugar || '';
     var fecha = formatDate(evento.fecha);
     var slug = evento.slug || '';
 
-    section.innerHTML =
-      '<div data-wf--spacer--variant="small" class="u-section-spacer u-ignore-trim"></div>' +
-      '<div class="u-container">' +
-        '<div class="u-flex-vertical-nowrap u-gap-4" style="align-items:center;text-align:center;">' +
-          '<div class="u-flex-horizontal-wrap u-gap-2" style="align-items:center;justify-content:center;">' +
-            '<span style="display:inline-block;width:12px;height:12px;background:#e53e3e;border-radius:50%;animation:selfie-pulse 1.5s ease-in-out infinite;"></span>' +
-            '<span class="u-text-style-small" style="text-transform:uppercase;letter-spacing:0.1em;font-weight:700;">En Vivo</span>' +
-          '</div>' +
-          '<div class="u-heading u-text-style-h2" style="margin:0;">' + escapeHtml(nombre) + '</div>' +
-          (lugar ? '<div class="u-text u-text-style-main">' + escapeHtml(lugar) + (fecha ? ' &middot; ' + escapeHtml(fecha) : '') + '</div>' : '') +
-          '<div id="live-photos-container" class="u-grid-wrapper" style="width:100%;min-height:0;" data-evento-slug="' + escapeHtml(slug) + '"></div>' +
-        '</div>' +
-      '</div>' +
-      '<div data-wf--spacer--variant="small" class="u-section-spacer u-ignore-trim"></div>';
+    // Fill title
+    var titleEl = section.querySelector('[data-selfie="live-title"]');
+    if (titleEl) titleEl.textContent = nombre;
 
-    if (!document.getElementById('selfie-pulse-style')) {
-      var style = document.createElement('style');
-      style.id = 'selfie-pulse-style';
-      style.textContent = '@keyframes selfie-pulse{0%,100%{opacity:1}50%{opacity:.4}}';
-      document.head.appendChild(style);
+    // Fill subtitle
+    var subtitleEl = section.querySelector('[data-selfie="live-subtitle"]');
+    if (subtitleEl) {
+      var parts = [];
+      if (lugar) parts.push(lugar);
+      if (fecha) parts.push(fecha);
+      subtitleEl.textContent = parts.join(' · ');
     }
 
-    return section;
+    // Show the section
+    section.style.display = '';
+
+    // Load photos into the slider/card
+    if (slug) {
+      loadPhotos(slug, section);
+    }
   }
 
-  var DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTT1ggtYTqj9MAhMTG8mQPmga1FMmzSiump-LAZrF6VPbpve8g3Zo4XzVzPksLchZpDQ/exec';
-  var DRIVE_FOLDER_ID = '1J5qvFBJWX__2eYnlNFzBXN4qlieQr44U';
+  function hideLiveSection() {
+    var section = document.getElementById('section_eventos-en-vivo');
+    if (section) section.style.display = 'none';
+  }
 
-  function loadPhotos(slug) {
+  function loadPhotos(slug, section) {
     var url = DRIVE_SCRIPT_URL + '?folder=' + encodeURIComponent(DRIVE_FOLDER_ID) + '&sub=' + encodeURIComponent(slug);
     fetch(url)
       .then(function (res) { return res.json(); })
       .then(function (data) {
         if (!data.fotos || data.fotos.length === 0) return;
-        var container = document.getElementById('live-photos-container');
-        if (!container) return;
-        container.style.display = 'grid';
-        container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(250px, 1fr))';
-        container.style.gap = 'var(--space--3, 1rem)';
-        container.style.marginTop = 'var(--space--4, 1.5rem)';
-        data.fotos.forEach(function (foto) {
-          var img = document.createElement('img');
-          img.alt = foto.name;
-          img.loading = 'lazy';
-          img.style.cssText = 'width:100%;height:auto;border-radius:var(--radius--med,0.5rem);aspect-ratio:4/3;object-fit:cover;';
-          container.appendChild(img);
-          fetch(foto.url)
+
+        // Set the first photo as cover on the card image
+        var imgEl = section.querySelector('[data-selfie="live-image"]');
+        if (imgEl && data.fotos[0]) {
+          fetch(data.fotos[0].url)
             .then(function (r) { return r.text(); })
             .then(function (b64) {
-              if (b64) img.src = 'data:image/jpeg;base64,' + b64;
+              if (b64) imgEl.src = 'data:image/jpeg;base64,' + b64;
             })
             .catch(function () {});
-        });
+        }
+
+        // If there's a slider, clone cards for additional photos
+        var sliderList = section.querySelector('.slider_list');
+        if (sliderList && data.fotos.length > 1) {
+          var templateCard = sliderList.querySelector('.card_primary_wrap');
+          if (templateCard) {
+            for (var i = 1; i < data.fotos.length; i++) {
+              var card = templateCard.cloneNode(true);
+              var cardImg = card.querySelector('[data-selfie="live-image"]') || card.querySelector('img');
+              if (cardImg) {
+                (function (img, foto) {
+                  fetch(foto.url)
+                    .then(function (r) { return r.text(); })
+                    .then(function (b64) {
+                      if (b64) img.src = 'data:image/jpeg;base64,' + b64;
+                    })
+                    .catch(function () {});
+                })(cardImg, data.fotos[i]);
+              }
+              sliderList.appendChild(card);
+            }
+            // Update Swiper
+            var swiperEl = section.querySelector('.swiper');
+            if (swiperEl && swiperEl.swiper) {
+              swiperEl.swiper.update();
+            }
+          }
+        }
       })
       .catch(function (err) {
         console.warn('[selfie-sheets-live] Photos fetch failed:', err.message);
       });
   }
 
-  function insertAfterHero(section) {
-    var hero = document.querySelector('.hero_wrap');
-    if (hero && hero.nextSibling) {
-      hero.parentNode.insertBefore(section, hero.nextSibling);
-    } else if (hero) {
-      hero.parentNode.appendChild(section);
-    } else {
-      console.warn('[selfie-sheets-live] hero_wrap not found');
-    }
-  }
-
   function init() {
+    // Hide the section by default until we know if there's an active event
+    hideLiveSection();
+
     fetch(CSV_URL)
       .then(function (res) {
         if (!res.ok) throw new Error('Google Sheets response ' + res.status);
@@ -182,12 +193,9 @@
         }
 
         if (activeEvent) {
-          var section = buildLiveSection(activeEvent);
-          insertAfterHero(section);
-          if (activeEvent.slug) {
-            loadPhotos(activeEvent.slug);
-          }
+          fillLiveSection(activeEvent);
         }
+        // If no active event, section stays hidden
       })
       .catch(function (err) {
         console.warn('[selfie-sheets-live] Fetch failed:', err.message);
