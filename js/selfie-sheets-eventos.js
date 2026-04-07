@@ -192,6 +192,9 @@
       return;
     }
 
+    // Capture template BEFORE clearing the slider
+    captureTemplate();
+
     sliderList.innerHTML = '';
 
     for (var i = 0; i < items.length; i++) {
