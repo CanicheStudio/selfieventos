@@ -83,28 +83,42 @@
 
   function formatDate(dateStr) {
     if (!dateStr) return '';
-    var d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('es-AR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
+    var parts = dateStr.split('-');
+    if (parts.length === 3) {
+      var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      if (isNaN(d.getTime())) return dateStr;
+      return d.toLocaleDateString('es-AR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+    }
+    return dateStr;
   }
 
-  // Capture the template card IMMEDIATELY (before Swiper init modifies the DOM)
-  var templateCard = (function () {
+  var templateCard = null;
+
+  function captureTemplate() {
+    if (templateCard) return;
     var section = document.getElementById('section_eventos-pasados');
-    if (!section) return null;
+    if (!section) return;
     var card = section.querySelector('[data-selfie="title"]');
-    if (!card) return null;
-    // Walk up to the card_primary_wrap
+    if (!card) {
+      // Fallback: find any card_primary_wrap
+      var wrap = section.querySelector('.card_primary_wrap');
+      if (wrap) {
+        templateCard = wrap.cloneNode(true);
+        return;
+      }
+      return;
+    }
     var wrap = card.closest('.card_primary_wrap');
-    if (!wrap) return null;
-    return wrap.cloneNode(true);
-  })();
+    if (!wrap) return;
+    templateCard = wrap.cloneNode(true);
+  }
 
   function buildCard(evento) {
+    captureTemplate();
     if (!templateCard) return null;
 
     var card = templateCard.cloneNode(true);
