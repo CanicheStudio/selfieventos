@@ -8,7 +8,7 @@
   'use strict';
 
   var CSV_URL =
-    'https://docs.google.com/spreadsheets/d/1TxVWutW9zIiJMulR96NPNEj4M4cjrpmaYZaClQ3RmSw/gviz/tq?tqx=out:csv';
+    'https://docs.google.com/spreadsheets/d/e/2PACX-1vRBA0AENnlRUR_ABS-z8Sh1yHZXCkVAj_32v8QPcsSANlpqUq9ZOL1wW1YHCEhsBP11UbwGw2sFZpwm/pub?gid=0&single=true&output=csv';
 
   var CARD_VARIANT = 'w-variant-51efa20c-c7be-48fe-973a-11367f19d622';
 
