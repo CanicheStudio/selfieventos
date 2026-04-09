@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Album de Fotos | Selfie Eventos</title>
+  <meta name="description" content="Descarga las fotos de tu evento con Selfie Eventos">
+  <meta property="og:title" content="Album de Fotos | Selfie Eventos">
+  <link rel="icon" href="images/favicon.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700;1,900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset & Base ────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #FFF5F5;
+      --bg-card: #ffffff;
+      --primary: #FF6B9D;
+      --primary-dark: #e8558a;
+      --primary-light: #FFD4E3;
+      --secondary: #3B3BFF;
+      --dark: #1a1a2e;
+      --dark-soft: #2d2d4e;
+      --gray: #6b7280;
+      --gray-light: #e5e7eb;
+      --white: #ffffff;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --shadow: 0 4px 24px rgba(26, 26, 46, 0.08);
+      --shadow-lg: 0 12px 40px rgba(26, 26, 46, 0.12);
+      --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    html {
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: var(--bg);
+      color: var(--dark);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    h1, h2, h3 {
+      font-family: 'Playfair Display', serif;
+      line-height: 1.2;
+    }
+
+    /* ── Header ──────────────────────────────────────── */
+    .album-header {
+      background: var(--dark);
+      color: var(--white);
+      padding: 1.25rem 1.5rem;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .album-header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .album-brand {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .album-event-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.75rem;
+      font-weight: 900;
+      margin-top: 0.3rem;
+      line-height: 1.15;
+    }
+
+    .album-event-details {
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.65);
+      margin-top: 0.2rem;
+      font-weight: 400;
+    }
+
+    /* ── Gate (email form) ───────────────────────────── */
+    .album-gate {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 120px);
+      padding: 2rem 1.5rem;
+    }
+
+    .gate-card {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      padding: 3rem 2.5rem;
+      max-width: 440px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .gate-card h2 {
+      font-size: 1.75rem;
+      margin-bottom: 0.5rem;
+      color: var(--dark);
+    }
+
+    .gate-card p {
+      color: var(--gray);
+      margin-bottom: 1.75rem;
+      font-size: 0.95rem;
+    }
+
+    .gate-card .gate-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 1.25rem;
+      background: var(--primary-light);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.75rem;
+    }
+
+    .gate-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .gate-input {
+      width: 100%;
+      padding: 0.9rem 1.1rem;
+      border: 2px solid var(--gray-light);
+      border-radius: var(--radius-sm);
+      font-family: 'Outfit', sans-serif;
+      font-size: 1rem;
+      color: var(--dark);
+      background: var(--white);
+      transition: border-color var(--transition);
+      outline: none;
+    }
+
+    .gate-input:focus {
+      border-color: var(--primary);
+    }
+
+    .gate-input::placeholder {
+      color: #aaa;
+    }
+
+    .gate-btn {
+      width: 100%;
+      padding: 0.9rem;
+      background: var(--primary);
+      color: var(--white);
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: 'Outfit', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background var(--transition), transform var(--transition);
+    }
+
+    .gate-btn:hover {
+      background: var(--primary-dark);
+      transform: translateY(-1px);
+    }
+
+    .gate-btn:active {
+      transform: translateY(0);
+    }
+
+    .gate-btn:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .gate-privacy {
+      font-size: 0.78rem;
+      color: #aaa;
+      margin-top: 0.5rem;
+    }
+
+    /* ── Gallery section ─────────────────────────────── */
+    .album-gallery-section {
+      display: none;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1.5rem 1.5rem 6rem;
+    }
+
+    /* ── Tabs ────────────────────────────────────────── */
+    .album-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      align-items: center;
+    }
+
+    .album-tab {
+      padding: 0.55rem 1.25rem;
+      background: var(--white);
+      border: 2px solid var(--gray-light);
+      border-radius: 100px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--gray);
+      cursor: pointer;
+      transition: all var(--transition);
+      user-select: none;
+    }
+
+    .album-tab:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .album-tab.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: var(--white);
+    }
+
+    .album-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .album-select-all-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+      color: var(--gray);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .album-select-all-wrap input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+
+    /* ── Photo grid ──────────────────────────────────── */
+    .album-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .album-item {
+      position: relative;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      background: var(--white);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      transition: transform var(--transition), box-shadow var(--transition);
+    }
+
+    .album-item:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow);
+    }
+
+    .album-item.selected {
+      outline: 3px solid var(--primary);
+      outline-offset: -3px;
+    }
+
+    .album-item-inner {
+      position: relative;
+    }
+
+    .album-img {
+      width: 100%;
+      display: block;
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      cursor: pointer;
+      transition: opacity var(--transition);
+    }
+
+    .album-img:hover {
+      opacity: 0.9;
+    }
+
+    .album-checkbox-wrap {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      z-index: 5;
+      cursor: pointer;
+    }
+
+    .album-checkbox {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .album-checkbox-custom {
+      display: block;
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      background: rgba(255, 255, 255, 0.85);
+      border: 2px solid rgba(0, 0, 0, 0.15);
+      transition: all var(--transition);
+      position: relative;
+      backdrop-filter: blur(4px);
+    }
+
+    .album-checkbox-custom::after {
+      content: '';
+      position: absolute;
+      top: 4px;
+      left: 8px;
+      width: 6px;
+      height: 12px;
+      border: solid var(--white);
+      border-width: 0 2.5px 2.5px 0;
+      transform: rotate(45deg);
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+
+    .album-checkbox:checked + .album-checkbox-custom {
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .album-checkbox:checked + .album-checkbox-custom::after {
+      opacity: 1;
+    }
+
+    .album-item:hover .album-checkbox-custom {
+      border-color: var(--primary);
+    }
+
+    /* ── Empty state ─────────────────────────────────── */
+    .album-empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--gray);
+    }
+
+    .album-empty p:first-child {
+      font-size: 1.1rem;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
+
+    .album-empty p:last-child {
+      font-size: 0.875rem;
+    }
+
+    /* ── Spinner ─────────────────────────────────────── */
+    .album-spinner {
+      display: none;
+      text-align: center;
+      padding: 4rem 0;
+    }
+
+    .album-spinner .spinner-ring {
+      width: 48px;
+      height: 48px;
+      border: 4px solid var(--primary-light);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 1rem;
+    }
+
+    .album-spinner p {
+      color: var(--gray);
+      font-size: 0.9rem;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ── Action bar (bottom) ─────────────────────────── */
+    .album-action-bar {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--dark);
+      color: var(--white);
+      padding: 0.85rem 1.5rem;
+      z-index: 90;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+    }
+
+    .album-action-bar-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .album-selected-count {
+      font-size: 0.875rem;
+      color: rgba(255,255,255,0.7);
+      min-width: 120px;
+    }
+
+    .album-action-buttons {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .album-action-btn {
+      padding: 0.55rem 1.15rem;
+      border: none;
+      border-radius: 100px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition);
+      white-space: nowrap;
+    }
+
+    .album-action-btn--primary {
+      background: var(--primary);
+      color: var(--white);
+    }
+
+    .album-action-btn--primary:hover {
+      background: var(--primary-dark);
+    }
+
+    .album-action-btn--primary:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .album-action-btn--secondary {
+      background: rgba(255,255,255,0.12);
+      color: var(--white);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .album-action-btn--secondary:hover {
+      background: rgba(255,255,255,0.2);
+    }
+
+    .album-download-progress {
+      display: none;
+      font-size: 0.8rem;
+      color: var(--primary);
+      text-align: center;
+      padding: 0.25rem 0;
+    }
+
+    /* ── Lightbox ────────────────────────────────────── */
+    .album-lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 10, 20, 0.92);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
+    }
+
+    .lightbox-content {
+      position: relative;
+      max-width: 92vw;
+      max-height: 88vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .lightbox-img {
+      max-width: 90vw;
+      max-height: 85vh;
+      object-fit: contain;
+      border-radius: 8px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+    }
+
+    .lightbox-close {
+      position: fixed;
+      top: 1.25rem;
+      right: 1.25rem;
+      width: 44px;
+      height: 44px;
+      background: rgba(255,255,255,0.1);
+      border: none;
+      border-radius: 50%;
+      color: var(--white);
+      font-size: 1.5rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background var(--transition);
+      z-index: 210;
+    }
+
+    .lightbox-close:hover {
+      background: rgba(255,255,255,0.2);
+    }
+
+    .lightbox-nav {
+      position: fixed;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 48px;
+      height: 48px;
+      background: rgba(255,255,255,0.1);
+      border: none;
+      border-radius: 50%;
+      color: var(--white);
+      font-size: 1.25rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background var(--transition);
+      z-index: 210;
+    }
+
+    .lightbox-nav:hover {
+      background: rgba(255,255,255,0.25);
+    }
+
+    .lightbox-nav--prev { left: 1rem; }
+    .lightbox-nav--next { right: 1rem; }
+
+    .lightbox-bottom {
+      position: fixed;
+      bottom: 1.25rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      z-index: 210;
+    }
+
+    .lightbox-counter {
+      font-size: 0.875rem;
+      color: rgba(255,255,255,0.65);
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .lightbox-download-btn {
+      padding: 0.5rem 1rem;
+      background: var(--primary);
+      color: var(--white);
+      border: none;
+      border-radius: 100px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .lightbox-download-btn:hover {
+      background: var(--primary-dark);
+    }
+
+    /* ── Responsive ──────────────────────────────────── */
+    @media (max-width: 768px) {
+      .album-event-name { font-size: 1.35rem; }
+      .gate-card { padding: 2.25rem 1.75rem; }
+      .gate-card h2 { font-size: 1.4rem; }
+
+      .album-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 8px;
+      }
+
+      .album-action-bar-inner {
+        flex-direction: column;
+        align-items: stretch;
+        text-align: center;
+        gap: 0.5rem;
+      }
+
+      .album-action-buttons {
+        justify-content: center;
+      }
+
+      .lightbox-nav { width: 40px; height: 40px; font-size: 1rem; }
+      .lightbox-nav--prev { left: 0.5rem; }
+      .lightbox-nav--next { right: 0.5rem; }
+    }
+
+    @media (max-width: 480px) {
+      .album-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+      }
+
+      .album-checkbox-custom {
+        width: 22px;
+        height: 22px;
+        border-radius: 5px;
+      }
+
+      .album-checkbox-custom::after {
+        top: 3px;
+        left: 7px;
+        width: 5px;
+        height: 10px;
+      }
+
+      .album-action-btn {
+        font-size: 0.8rem;
+        padding: 0.5rem 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="album-header">
+    <div class="album-header-inner">
+      <a href="/" class="album-brand">Selfie Eventos</a>
+      <h1 class="album-event-name" id="album-event-name">Cargando...</h1>
+      <p class="album-event-details" id="album-event-details"></p>
+    </div>
+  </header>
+
+  <!-- Email gate -->
+  <section class="album-gate" id="album-gate">
+    <div class="gate-card">
+      <div class="gate-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FF6B9D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      </div>
+      <h2>Tu album de fotos</h2>
+      <p>Ingresa tu email para acceder a las fotos del evento y descargarlas.</p>
+      <form id="album-email-form" class="gate-form">
+        <input
+          type="email"
+          id="album-email-input"
+          class="gate-input"
+          placeholder="tu@email.com"
+          required
+          autocomplete="email"
+        >
+        <button type="submit" class="gate-btn">Ver mis fotos</button>
+      </form>
+      <p class="gate-privacy">Solo usamos tu email para saber cuantos invitados vieron las fotos.</p>
+    </div>
+  </section>
+
+  <!-- Gallery (hidden until email entered) -->
+  <main class="album-gallery-section" id="album-gallery-section">
+
+    <!-- Spinner -->
+    <div class="album-spinner" id="album-spinner">
+      <div class="spinner-ring"></div>
+      <p>Cargando fotos...</p>
+    </div>
+
+    <!-- Toolbar: tabs + select all -->
+    <div class="album-toolbar">
+      <div class="album-tabs">
+        <button class="album-tab active" id="album-tab-fotos">
+          Fotos<span id="album-fotos-count"></span>
+        </button>
+        <button class="album-tab" id="album-tab-tiras">
+          Tiras<span id="album-tiras-count"></span>
+        </button>
+      </div>
+      <label class="album-select-all-wrap">
+        <input type="checkbox" id="album-select-all">
+        Seleccionar todas
+      </label>
+    </div>
+
+    <!-- Photo grid -->
+    <div class="album-grid" id="album-grid"></div>
+
+    <!-- Download progress -->
+    <div class="album-download-progress" id="album-download-progress"></div>
+  </main>
+
+  <!-- Action bar (fixed bottom) -->
+  <div class="album-action-bar" id="album-action-bar">
+    <div class="album-action-bar-inner">
+      <span class="album-selected-count" id="album-selected-count"></span>
+      <div class="album-action-buttons">
+        <button class="album-action-btn album-action-btn--primary" id="album-btn-download-selected" disabled>
+          Descargar seleccionadas
+        </button>
+        <button class="album-action-btn album-action-btn--secondary" id="album-btn-download-all">
+          Descargar todas
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lightbox -->
+  <div class="album-lightbox" id="album-lightbox">
+    <button class="lightbox-close" aria-label="Cerrar">&times;</button>
+    <button class="lightbox-nav lightbox-nav--prev" id="lightbox-prev" aria-label="Anterior">&#8249;</button>
+    <div class="lightbox-content">
+      <img class="lightbox-img" id="lightbox-img" src="" alt="">
+    </div>
+    <button class="lightbox-nav lightbox-nav--next" id="lightbox-next" aria-label="Siguiente">&#8250;</button>
+    <div class="lightbox-bottom">
+      <span class="lightbox-counter" id="lightbox-counter"></span>
+      <button class="lightbox-download-btn" id="lightbox-download">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Descargar
+      </button>
+    </div>
+  </div>
+
+  <!-- Dependencies -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+  <!-- Album logic -->
+  <script src="js/selfie-album.js"></script>
+</body>
+</html>
