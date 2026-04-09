@@ -11,9 +11,6 @@
     'https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhU1olZb4klwB2qK-lxDn6FN-3RIRFkjZ5IDHedKw_MthNOdfV3dlvu__izfFLupRgcegFM2JUpDM/pub?gid=0&single=true&output=csv';
 
   var CARD_VARIANT = 'w-variant-51efa20c-c7be-48fe-973a-11367f19d622';
-  var CLOUD_NAME = 'dcjutekja';
-  var CLOUDINARY_BASE = 'https://res.cloudinary.com/' + CLOUD_NAME + '/image/upload';
-  var CLOUDINARY_FOLDER = 'eventos';
 
   /**
    * Parse CSV text into an array of objects.
@@ -159,13 +156,11 @@
     return card;
   }
 
-  function loadCoverPhoto(slug) {
-    // Load caratula image directly by name — no listing needed
-    var src = CLOUDINARY_BASE + '/f_auto,q_auto,w_600/' + CLOUDINARY_FOLDER + '/' + slug + '/caratula';
+  function loadCoverPhoto(slug, imagenUrl) {
+    if (!imagenUrl) return;
     var imgs = document.querySelectorAll('[data-evento-slug="' + slug + '"]');
     for (var i = 0; i < imgs.length; i++) {
-      imgs[i].src = src;
-      // If caratula doesn't exist, keep the placeholder
+      imgs[i].src = imagenUrl;
       imgs[i].onerror = function () { this.onerror = null; };
     }
   }
@@ -226,10 +221,10 @@
 
         if (pastEvents.length > 0) {
           renderEventos(pastEvents);
-          // Load cover photo for each event from Drive
+          // Load cover photo from imagen column in Sheet
           for (var j = 0; j < pastEvents.length; j++) {
-            if (pastEvents[j].slug) {
-              loadCoverPhoto(pastEvents[j].slug);
+            if (pastEvents[j].slug && pastEvents[j].imagen) {
+              loadCoverPhoto(pastEvents[j].slug, pastEvents[j].imagen.trim());
             }
           }
         }

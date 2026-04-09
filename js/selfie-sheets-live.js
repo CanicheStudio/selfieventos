@@ -11,10 +11,6 @@
   var CSV_URL =
     'https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhU1olZb4klwB2qK-lxDn6FN-3RIRFkjZ5IDHedKw_MthNOdfV3dlvu__izfFLupRgcegFM2JUpDM/pub?gid=0&single=true&output=csv';
 
-  var CLOUD_NAME = 'dcjutekja';
-  var CLOUDINARY_BASE = 'https://res.cloudinary.com/' + CLOUD_NAME + '/image/upload';
-  var CLOUDINARY_FOLDER = 'eventos';
-
   function parseCSV(text) {
     var rows = [];
     var row = [];
@@ -107,11 +103,12 @@
       subtitleEl.textContent = parts.join(' · ');
     }
 
-    // Load caratula as cover image
-    if (slug) {
+    // Load cover image from Sheet's imagen column
+    var imagenUrl = evento.imagen ? evento.imagen.trim() : '';
+    if (imagenUrl) {
       var imgEl = section.querySelector('[data-selfie="live-image"]');
       if (imgEl) {
-        imgEl.src = CLOUDINARY_BASE + '/f_auto,q_auto,w_800/' + CLOUDINARY_FOLDER + '/' + slug + '/caratula';
+        imgEl.src = imagenUrl;
         imgEl.onerror = function () { this.onerror = null; };
       }
     }
