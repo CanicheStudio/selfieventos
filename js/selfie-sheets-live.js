@@ -3,6 +3,7 @@
  * Fetch eventos activos (activo=SI) desde Google Sheets (CSV).
  * Si hay uno activo, muestra la sección #section_eventos-en-vivo y llena los datos.
  * Si no hay evento activo, oculta la sección.
+ * Fotos desde Cloudinary CDN.
  */
 (function () {
   'use strict';
@@ -10,8 +11,9 @@
   var CSV_URL =
     'https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhU1olZb4klwB2qK-lxDn6FN-3RIRFkjZ5IDHedKw_MthNOdfV3dlvu__izfFLupRgcegFM2JUpDM/pub?gid=0&single=true&output=csv';
 
-  var DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTT1ggtYTqj9MAhMTG8mQPmga1FMmzSiump-LAZrF6VPbpve8g3Zo4XzVzPksLchZpDQ/exec';
-  var DRIVE_FOLDER_ID = '1J5qvFBJWX__2eYnlNFzBXN4qlieQr44U';
+  var CLOUD_NAME = 'dcjutekja';
+  var CLOUDINARY_BASE = 'https://res.cloudinary.com/' + CLOUD_NAME + '/image/upload';
+  var CLOUDINARY_FOLDER = 'selfie-eventos';
 
   function parseCSV(text) {
     var rows = [];
@@ -94,11 +96,9 @@
     var fecha = formatDate(evento.fecha);
     var slug = evento.slug || '';
 
-    // Fill title
     var titleEl = section.querySelector('[data-selfie="live-title"]');
     if (titleEl) titleEl.textContent = nombre;
 
-    // Fill subtitle
     var subtitleEl = section.querySelector('[data-selfie="live-subtitle"]');
     if (subtitleEl) {
       var parts = [];
@@ -107,10 +107,8 @@
       subtitleEl.textContent = parts.join(' · ');
     }
 
-    // Show the section
     section.style.display = '';
 
-    // Load photos into the slider/card
     if (slug) {
       loadPhotos(slug, section);
     }
@@ -122,44 +120,37 @@
   }
 
   function loadPhotos(slug, section) {
-    var url = DRIVE_SCRIPT_URL + '?folder=' + encodeURIComponent(DRIVE_FOLDER_ID) + '&sub=' + encodeURIComponent(slug);
-    fetch(url)
-      .then(function (res) { return res.json(); })
-      .then(function (data) {
-        if (!data.fotos || data.fotos.length === 0) return;
+    // Use Cloudinary Admin API via client-side list
+    // Cloudinary allows listing resources by prefix if "Resource list" is enabled in Security settings
+    var listUrl = CLOUDINARY_BASE + '/list/' + CLOUDINARY_FOLDER + '/' + slug + '.json';
 
-        // Set the first photo as cover on the card image
+    fetch(listUrl)
+      .then(function (res) {
+        if (!res.ok) throw new Error('Cloudinary list response ' + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        if (!data.resources || data.resources.length === 0) return;
+
+        // Set cover photo on the card image
         var imgEl = section.querySelector('[data-selfie="live-image"]');
-        if (imgEl && data.fotos[0]) {
-          fetch(data.fotos[0].url)
-            .then(function (r) { return r.text(); })
-            .then(function (b64) {
-              if (b64) imgEl.src = 'data:image/jpeg;base64,' + b64;
-            })
-            .catch(function () {});
+        if (imgEl && data.resources[0]) {
+          imgEl.src = CLOUDINARY_BASE + '/f_auto,q_auto,w_800/' + data.resources[0].public_id;
         }
 
-        // If there's a slider, clone cards for additional photos
+        // Clone cards for additional photos in the slider
         var sliderList = section.querySelector('.slider_list');
-        if (sliderList && data.fotos.length > 1) {
+        if (sliderList && data.resources.length > 1) {
           var templateCard = sliderList.querySelector('.card_primary_wrap');
           if (templateCard) {
-            for (var i = 1; i < data.fotos.length; i++) {
+            for (var i = 1; i < data.resources.length; i++) {
               var card = templateCard.cloneNode(true);
               var cardImg = card.querySelector('[data-selfie="live-image"]') || card.querySelector('img');
               if (cardImg) {
-                (function (img, foto) {
-                  fetch(foto.url)
-                    .then(function (r) { return r.text(); })
-                    .then(function (b64) {
-                      if (b64) img.src = 'data:image/jpeg;base64,' + b64;
-                    })
-                    .catch(function () {});
-                })(cardImg, data.fotos[i]);
+                cardImg.src = CLOUDINARY_BASE + '/f_auto,q_auto,w_800/' + data.resources[i].public_id;
               }
               sliderList.appendChild(card);
             }
-            // Update Swiper
             var swiperEl = section.querySelector('.swiper');
             if (swiperEl && swiperEl.swiper) {
               swiperEl.swiper.update();
@@ -168,12 +159,11 @@
         }
       })
       .catch(function (err) {
-        console.warn('[selfie-sheets-live] Photos fetch failed:', err.message);
+        console.warn('[selfie-sheets-live] Cloudinary fetch failed:', err.message);
       });
   }
 
   function init() {
-    // Hide the section by default until we know if there's an active event
     hideLiveSection();
 
     fetch(CSV_URL)
@@ -195,7 +185,6 @@
         if (activeEvent) {
           fillLiveSection(activeEvent);
         }
-        // If no active event, section stays hidden
       })
       .catch(function (err) {
         console.warn('[selfie-sheets-live] Fetch failed:', err.message);

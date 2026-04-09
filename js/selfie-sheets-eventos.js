@@ -11,8 +11,9 @@
     'https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhU1olZb4klwB2qK-lxDn6FN-3RIRFkjZ5IDHedKw_MthNOdfV3dlvu__izfFLupRgcegFM2JUpDM/pub?gid=0&single=true&output=csv';
 
   var CARD_VARIANT = 'w-variant-51efa20c-c7be-48fe-973a-11367f19d622';
-  var DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTT1ggtYTqj9MAhMTG8mQPmga1FMmzSiump-LAZrF6VPbpve8g3Zo4XzVzPksLchZpDQ/exec';
-  var DRIVE_FOLDER_ID = '1J5qvFBJWX__2eYnlNFzBXN4qlieQr44U';
+  var CLOUD_NAME = 'dcjutekja';
+  var CLOUDINARY_BASE = 'https://res.cloudinary.com/' + CLOUD_NAME + '/image/upload';
+  var CLOUDINARY_FOLDER = 'selfie-eventos';
 
   /**
    * Parse CSV text into an array of objects.
@@ -159,22 +160,20 @@
   }
 
   function loadCoverPhoto(slug) {
-    var url = DRIVE_SCRIPT_URL + '?folder=' + encodeURIComponent(DRIVE_FOLDER_ID) + '&sub=' + encodeURIComponent(slug);
-    fetch(url)
-      .then(function (res) { return res.json(); })
+    // Use Cloudinary resource list to get first photo as cover
+    var listUrl = CLOUDINARY_BASE + '/list/' + CLOUDINARY_FOLDER + '/' + slug + '.json';
+    fetch(listUrl)
+      .then(function (res) {
+        if (!res.ok) throw new Error('Cloudinary ' + res.status);
+        return res.json();
+      })
       .then(function (data) {
-        if (!data.fotos || data.fotos.length === 0) return;
-        var photoUrl = data.fotos[0].url;
-        fetch(photoUrl)
-          .then(function (r) { return r.text(); })
-          .then(function (b64) {
-            if (!b64) return;
-            var src = 'data:image/jpeg;base64,' + b64;
-            var imgs = document.querySelectorAll('[data-evento-slug="' + slug + '"]');
-            for (var i = 0; i < imgs.length; i++) {
-              imgs[i].src = src;
-            }
-          });
+        if (!data.resources || data.resources.length === 0) return;
+        var src = CLOUDINARY_BASE + '/f_auto,q_auto,w_600/' + data.resources[0].public_id;
+        var imgs = document.querySelectorAll('[data-evento-slug="' + slug + '"]');
+        for (var i = 0; i < imgs.length; i++) {
+          imgs[i].src = src;
+        }
       })
       .catch(function () {});
   }
