@@ -13,7 +13,7 @@
   var CARD_VARIANT = 'w-variant-51efa20c-c7be-48fe-973a-11367f19d622';
   var CLOUD_NAME = 'dcjutekja';
   var CLOUDINARY_BASE = 'https://res.cloudinary.com/' + CLOUD_NAME + '/image/upload';
-  var CLOUDINARY_FOLDER = 'selfie-eventos';
+  var CLOUDINARY_FOLDER = 'eventos';
 
   /**
    * Parse CSV text into an array of objects.
@@ -161,7 +161,7 @@
 
   function loadCoverPhoto(slug) {
     // Use Cloudinary resource list to get first photo as cover
-    var listUrl = CLOUDINARY_BASE + '/list/' + CLOUDINARY_FOLDER + '/' + slug + '.json';
+    var listUrl = CLOUDINARY_BASE + '/list/' + CLOUDINARY_FOLDER + '/' + slug + '/suelta.json';
     fetch(listUrl)
       .then(function (res) {
         if (!res.ok) throw new Error('Cloudinary ' + res.status);

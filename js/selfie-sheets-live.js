@@ -13,7 +13,7 @@
 
   var CLOUD_NAME = 'dcjutekja';
   var CLOUDINARY_BASE = 'https://res.cloudinary.com/' + CLOUD_NAME + '/image/upload';
-  var CLOUDINARY_FOLDER = 'selfie-eventos';
+  var CLOUDINARY_FOLDER = 'eventos';
 
   function parseCSV(text) {
     var rows = [];
@@ -122,7 +122,7 @@
   function loadPhotos(slug, section) {
     // Use Cloudinary Admin API via client-side list
     // Cloudinary allows listing resources by prefix if "Resource list" is enabled in Security settings
-    var listUrl = CLOUDINARY_BASE + '/list/' + CLOUDINARY_FOLDER + '/' + slug + '.json';
+    var listUrl = CLOUDINARY_BASE + '/list/' + CLOUDINARY_FOLDER + '/' + slug + '/suelta.json';
 
     fetch(listUrl)
       .then(function (res) {
