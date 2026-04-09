@@ -160,22 +160,14 @@
   }
 
   function loadCoverPhoto(slug) {
-    // Use Cloudinary resource list to get first photo as cover
-    var listUrl = CLOUDINARY_BASE + '/list/' + CLOUDINARY_FOLDER + '/' + slug + '/suelta.json';
-    fetch(listUrl)
-      .then(function (res) {
-        if (!res.ok) throw new Error('Cloudinary ' + res.status);
-        return res.json();
-      })
-      .then(function (data) {
-        if (!data.resources || data.resources.length === 0) return;
-        var src = CLOUDINARY_BASE + '/f_auto,q_auto,w_600/' + data.resources[0].public_id;
-        var imgs = document.querySelectorAll('[data-evento-slug="' + slug + '"]');
-        for (var i = 0; i < imgs.length; i++) {
-          imgs[i].src = src;
-        }
-      })
-      .catch(function () {});
+    // Load caratula image directly by name — no listing needed
+    var src = CLOUDINARY_BASE + '/f_auto,q_auto,w_600/' + CLOUDINARY_FOLDER + '/' + slug + '/caratula';
+    var imgs = document.querySelectorAll('[data-evento-slug="' + slug + '"]');
+    for (var i = 0; i < imgs.length; i++) {
+      imgs[i].src = src;
+      // If caratula doesn't exist, keep the placeholder
+      imgs[i].onerror = function () { this.onerror = null; };
+    }
   }
 
   function renderEventos(items) {

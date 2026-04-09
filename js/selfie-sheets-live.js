@@ -3,7 +3,7 @@
  * Fetch eventos activos (activo=SI) desde Google Sheets (CSV).
  * Si hay uno activo, muestra la sección #section_eventos-en-vivo y llena los datos.
  * Si no hay evento activo, oculta la sección.
- * Fotos desde Cloudinary CDN.
+ * Cover photo: caratula.jpg desde Cloudinary.
  */
 (function () {
   'use strict';
@@ -107,60 +107,21 @@
       subtitleEl.textContent = parts.join(' · ');
     }
 
-    section.style.display = '';
-
+    // Load caratula as cover image
     if (slug) {
-      loadPhotos(slug, section);
+      var imgEl = section.querySelector('[data-selfie="live-image"]');
+      if (imgEl) {
+        imgEl.src = CLOUDINARY_BASE + '/f_auto,q_auto,w_800/' + CLOUDINARY_FOLDER + '/' + slug + '/caratula';
+        imgEl.onerror = function () { this.onerror = null; };
+      }
     }
+
+    section.style.display = '';
   }
 
   function hideLiveSection() {
     var section = document.getElementById('section_eventos-en-vivo');
     if (section) section.style.display = 'none';
-  }
-
-  function loadPhotos(slug, section) {
-    // Use Cloudinary Admin API via client-side list
-    // Cloudinary allows listing resources by prefix if "Resource list" is enabled in Security settings
-    var listUrl = CLOUDINARY_BASE + '/list/' + CLOUDINARY_FOLDER + '/' + slug + '/suelta.json';
-
-    fetch(listUrl)
-      .then(function (res) {
-        if (!res.ok) throw new Error('Cloudinary list response ' + res.status);
-        return res.json();
-      })
-      .then(function (data) {
-        if (!data.resources || data.resources.length === 0) return;
-
-        // Set cover photo on the card image
-        var imgEl = section.querySelector('[data-selfie="live-image"]');
-        if (imgEl && data.resources[0]) {
-          imgEl.src = CLOUDINARY_BASE + '/f_auto,q_auto,w_800/' + data.resources[0].public_id;
-        }
-
-        // Clone cards for additional photos in the slider
-        var sliderList = section.querySelector('.slider_list');
-        if (sliderList && data.resources.length > 1) {
-          var templateCard = sliderList.querySelector('.card_primary_wrap');
-          if (templateCard) {
-            for (var i = 1; i < data.resources.length; i++) {
-              var card = templateCard.cloneNode(true);
-              var cardImg = card.querySelector('[data-selfie="live-image"]') || card.querySelector('img');
-              if (cardImg) {
-                cardImg.src = CLOUDINARY_BASE + '/f_auto,q_auto,w_800/' + data.resources[i].public_id;
-              }
-              sliderList.appendChild(card);
-            }
-            var swiperEl = section.querySelector('.swiper');
-            if (swiperEl && swiperEl.swiper) {
-              swiperEl.swiper.update();
-            }
-          }
-        }
-      })
-      .catch(function (err) {
-        console.warn('[selfie-sheets-live] Cloudinary fetch failed:', err.message);
-      });
   }
 
   function init() {
