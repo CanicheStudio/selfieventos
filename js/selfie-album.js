@@ -12,7 +12,7 @@
   var CLOUDINARY_BASE = 'https://res.cloudinary.com/' + CLOUD_NAME + '/image/upload';
   var CLOUDINARY_LIST = 'https://res.cloudinary.com/' + CLOUD_NAME + '/image/list/v2/';
   var CLOUDINARY_FOLDER = 'eventos';
-  var EMAIL_SCRIPT_URL = ''; // Google Apps Script web app URL
+  var EMAIL_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxUTHQVgv3ID3ybqeCdmNOo06teEpalLFWytWH3DckuGMojmoj69-jQRYVVYOoiMwfm/exec'; // Google Apps Script web app URL
   var CSV_URL =
     'https://docs.google.com/spreadsheets/d/e/2PACX-1vRBA0AENnlRUR_ABS-z8Sh1yHZXCkVAj_32v8QPcsSANlpqUq9ZOL1wW1YHCEhsBP11UbwGw2sFZpwm/pub?gid=0&single=true&output=csv';
 
