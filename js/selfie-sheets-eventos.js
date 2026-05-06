@@ -115,7 +115,7 @@
     templateCard = wrap.cloneNode(true);
   }
 
-  function buildCard(evento) {
+  function buildCard(evento, isEnVivo) {
     captureTemplate();
     if (!templateCard) return null;
 
@@ -153,6 +153,14 @@
       linkEl.setAttribute('aria-label', 'Ver album de ' + nombre);
     }
 
+    // Mark active event card so the EN VIVO badge + highlight CSS kicks in.
+    // CSS lives in the Webflow site (canichestatseventcardcss inline script).
+    if (isEnVivo) {
+      card.classList.add('eventcard_wrap');
+      card.classList.add('is-en-vivo');
+      card.setAttribute('data-selfie', 'event-card');
+    }
+
     return card;
   }
 
@@ -184,7 +192,9 @@
     sliderList.innerHTML = '';
 
     for (var i = 0; i < items.length; i++) {
-      var card = buildCard(items[i]);
+      var item = items[i];
+      var isEnVivo = (String(item.activo || '').toUpperCase().trim() === 'SI');
+      var card = buildCard(item, isEnVivo);
       if (card) sliderList.appendChild(card);
     }
 
@@ -204,27 +214,35 @@
       .then(function (csvText) {
         var rows = parseCSV(csvText);
 
-        // Filter: only past events (activo is NOT "SI")
+        // Split into active event (activo === "SI") and past events.
+        var activeEvent = null;
         var pastEvents = [];
         for (var i = 0; i < rows.length; i++) {
-          if ((rows[i].activo || '').toUpperCase().trim() !== 'SI') {
+          if (!rows[i].slug) continue;
+          if ((rows[i].activo || '').toUpperCase().trim() === 'SI') {
+            // First active wins. Sheet should not have more than one.
+            if (!activeEvent) activeEvent = rows[i];
+          } else {
             pastEvents.push(rows[i]);
           }
         }
 
-        // Sort by fecha descending
+        // Past events: sort by fecha descending
         pastEvents.sort(function (a, b) {
           var dateA = new Date(a.fecha || 0);
           var dateB = new Date(b.fecha || 0);
           return dateB.getTime() - dateA.getTime();
         });
 
-        if (pastEvents.length > 0) {
-          renderEventos(pastEvents);
+        // Active event goes first so the EN VIVO card is the leading slide.
+        var allEvents = activeEvent ? [activeEvent].concat(pastEvents) : pastEvents;
+
+        if (allEvents.length > 0) {
+          renderEventos(allEvents);
           // Load cover photo from imagen column in Sheet
-          for (var j = 0; j < pastEvents.length; j++) {
-            if (pastEvents[j].slug && pastEvents[j].imagen) {
-              loadCoverPhoto(pastEvents[j].slug, pastEvents[j].imagen.trim());
+          for (var j = 0; j < allEvents.length; j++) {
+            if (allEvents[j].slug && allEvents[j].imagen) {
+              loadCoverPhoto(allEvents[j].slug, allEvents[j].imagen.trim());
             }
           }
         }
