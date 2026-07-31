@@ -1,0 +1,26 @@
+name = "selfie-worker"
+main = "src/index.js"
+compatibility_date = "2026-07-30"
+
+# D1 — el database_id real se completa al crear la base en la cuenta de Cani (H2).
+# Para `wrangler dev --local` alcanza con el binding + una id placeholder.
+[[d1_databases]]
+binding = "DB"
+database_name = "selfie"
+database_id = "local-dev-placeholder"
+migrations_dir = "migrations"
+
+[vars]
+# CORS restringido (spec §4): NUNCA '*'
+ALLOWED_ORIGIN = "https://selfieeventos.webflow.io"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SECRETS — NUNCA en este archivo ni en el repo. Se cargan con:
+#   wrangler secret put PANEL_PIN
+#   wrangler secret put CLOUDINARY_API_KEY
+#   wrangler secret put CLOUDINARY_API_SECRET
+#   wrangler secret put CLOUDINARY_CLOUD_NAME     (no es secreto, pero se maneja igual)
+#
+# En local (`wrangler dev --local`) se leen de .dev.vars, que está gitignoreado.
+# Rotación documentada en la spec §4 (no requiere redeploy de código).
+# ─────────────────────────────────────────────────────────────────────────────
