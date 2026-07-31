@@ -49,10 +49,23 @@
 
   /* ──────────────────────── EVENTOS PASADOS (cards) ──────────────────────── */
 
-  function templateDesde(section) {
-    // Mismo fallback que el script v1: se clona la card existente como molde,
-    // así el markup del rediseño de Cani manda sobre cualquier HTML nuestro.
-    var wrap = section.querySelector('.card_primary_wrap');
+  /**
+   * Molde de card: se clona la card EXISTENTE, así el markup del rediseño de
+   * Cani manda sobre cualquier HTML nuestro.
+   *
+   * 🔴 EL MOLDE SE BUSCA DENTRO DEL slider_list, NO EN LA SECCIÓN ENTERA.
+   * Medido en la home viva (2026-07-31): hay **9** `.card_primary_wrap` y las
+   * **6 primeras NO son eventos** — son las cards de TIPOS DE EVENTO
+   * (Cumpleaños, Bar/Bat Mitzvah, Bodas, Quinceañeras, Corporativos, Fiestas)
+   * que viven en un `u-grid` aparte y aparecen ANTES en el DOM. Solo las 3
+   * últimas están dentro del slider.
+   * Un `querySelector` sobre la sección entera devolvería la PRIMERA => clonaría
+   * una card de tipo-de-evento como molde de "eventos pasados". Acotar al
+   * slider_list es lo que evita ese bug silencioso (se vería "bien" hasta que
+   * alguien note que el molde no es el correcto).
+   */
+  function templateDesde(sliderList) {
+    var wrap = sliderList.querySelector('.card_primary_wrap');
     return wrap ? wrap.cloneNode(true) : null;
   }
 
@@ -80,8 +93,9 @@
     var sliderList = section.querySelector('.slider_list');
     if (!sliderList) { console.warn('[selfie-home] slider_list not found'); return; }
 
-    var template = templateDesde(section);
-    if (!template) { console.warn('[selfie-home] card_primary_wrap not found'); return; }
+    // El molde sale del slider_list, NUNCA de la sección entera (ver templateDesde).
+    var template = templateDesde(sliderList);
+    if (!template) { console.warn('[selfie-home] card_primary_wrap not found dentro de slider_list'); return; }
 
     sliderList.innerHTML = '';
     eventos.forEach(function (ev) {
