@@ -7,7 +7,7 @@ compatibility_date = "2026-07-30"
 [[d1_databases]]
 binding = "DB"
 database_name = "selfie"
-database_id = "local-dev-placeholder"
+database_id = "fbc6333b-daa5-40fb-be3c-04fe02d2584a"
 migrations_dir = "migrations"
 
 [vars]

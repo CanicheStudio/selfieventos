@@ -22,7 +22,7 @@
     /* ─────────────────────────── WORKER (backend) ─────────────────────────── */
 
     // <<<PENDIENTE H2>>> URL del Worker deployado. Custodiado por assertReady().
-    WORKER_URL: '<<<PENDIENTE H2: https://selfie-worker.<subdominio>.workers.dev>>>',
+    WORKER_URL: 'https://selfie-worker.dantrinchero.workers.dev',
 
     /* ────────────────────────────── CLOUDINARY ────────────────────────────── */
 
@@ -30,7 +30,7 @@
     // 🔴 'dcjutekja' (cloud legacy de Fer) es un valor PROHIBIDO acá, no un default:
     // funciona, y por eso es el falso verde perfecto (el álbum leyendo del cloud
     // viejo mientras la migración está a medias). assertReady() lo rechaza por nombre.
-    CLOUD_NAME: '<<<PENDIENTE H1: cloud name de la cuenta nueva>>>',
+    CLOUD_NAME: 'selfieeventos',
 
     // Preset unsigned (config sellada: sin svg, 10 MB, disallow_public_id).
     UPLOAD_PRESET: 'selfie_subir_unsigned',

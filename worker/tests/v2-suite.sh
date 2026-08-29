@@ -21,6 +21,7 @@ echo; echo "── V2.1 assertReady(): custodia de placeholders + anti-legacy �
 R=$(node -e "
 global.window={};require('$JS/selfie-config.js');
 var C=window.SELFIE_CONFIG;
+C.WORKER_URL='<<<PENDIENTE H2: placeholder sintetico>>>'; C.CLOUD_NAME='<<<PENDIENTE H1: placeholder sintetico>>>';
 console.log('PEND:'+JSON.stringify(C.assertReady()));
 C.WORKER_URL='https://w.workers.dev'; C.CLOUD_NAME='selfie-caniche';
 console.log('LISTO:'+JSON.stringify(C.assertReady()));
