@@ -51,9 +51,20 @@
     // Medido en el E2E: aun mudado, el mensaje queda a ~1181px (hero de ~677px
     // encima) — bajo el pliegue en 1440x900. El scroll es parte del fix, no un
     // extra. OJO ORDEN: llamar DESPUES de setEstado — con el nodo vacio el CSS
-    // lo oculta (:empty) y scrollIntoView sobre display:none no hace nada
-    // (bug real observado en prod 2026-08-29).
-    if (n && n.textContent) n.scrollIntoView({ block: 'center' });
+    // lo oculta (:empty) y scrollIntoView sobre display:none no hace nada.
+    // Y el scroll DEBE reintentar: el browser restaura la posicion (0) en el
+    // evento load, que con imagenes pesadas llega DESPUES de este codigo y lo
+    // pisa (observado en prod: scrollY volvia a 0 con el nodo bien ubicado).
+    if (!n || !n.textContent) return;
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    var bajarAlMensaje = function () {
+      if (n.textContent && n.getBoundingClientRect().top > window.innerHeight * 0.9) {
+        n.scrollIntoView({ block: 'center' });
+      }
+    };
+    bajarAlMensaje();
+    setTimeout(bajarAlMensaje, 1200);
+    setTimeout(bajarAlMensaje, 2500);
   }
 
   /* ───────────────────────────── datos (Worker) ───────────────────────────── */
