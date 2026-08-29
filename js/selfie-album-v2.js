@@ -83,8 +83,15 @@
 
   function initGate() {
     var form = el('gate-form');
-    var input = el('gate-email');
-    if (!form || !input) return;
+    if (!form) return;
+    // webflow.js ata su propio submit al form (POST a Webflow Forms) ⇒ el lead
+    // se capturaba DOBLE (D1 + Webflow, con límite de 50/mes en plan free).
+    // Reemplazar el nodo por su clon suelta esos listeners; D1 queda como única captura.
+    var clon = form.cloneNode(true);
+    form.parentNode.replaceChild(clon, form);
+    form = clon;
+    var input = form.querySelector('[data-selfie="gate-email"]') || el('gate-email');
+    if (!input) return;
 
     form.addEventListener('submit', function (ev) {
       ev.preventDefault();

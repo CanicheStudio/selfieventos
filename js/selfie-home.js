@@ -93,6 +93,9 @@
     var sliderList = section.querySelector('.slider_list');
     if (!sliderList) { console.warn('[selfie-home] slider_list not found'); return; }
 
+    // 0 eventos: conservar las cards estáticas del diseño — nunca romper la portada.
+    if (!eventos.length) return;
+
     // El molde sale del slider_list, NUNCA de la sección entera (ver templateDesde).
     var template = templateDesde(sliderList);
     if (!template) { console.warn('[selfie-home] card_primary_wrap not found dentro de slider_list'); return; }
