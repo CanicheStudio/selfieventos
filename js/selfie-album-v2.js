@@ -50,8 +50,10 @@
     if (n && gate && gate.parentNode) gate.parentNode.insertBefore(n, gate.nextSibling);
     // Medido en el E2E: aun mudado, el mensaje queda a ~1181px (hero de ~677px
     // encima) — bajo el pliegue en 1440x900. El scroll es parte del fix, no un
-    // extra: sin el, "visible" solo es cierto para quien scrollea a ciegas.
-    if (n) n.scrollIntoView({ block: 'center' });
+    // extra. OJO ORDEN: llamar DESPUES de setEstado — con el nodo vacio el CSS
+    // lo oculta (:empty) y scrollIntoView sobre display:none no hace nada
+    // (bug real observado en prod 2026-08-29).
+    if (n && n.textContent) n.scrollIntoView({ block: 'center' });
   }
 
   /* ───────────────────────────── datos (Worker) ───────────────────────────── */
@@ -306,8 +308,8 @@
     state.slug = params.get('evento');
 
     if (!state.slug) {
-      estadoAlTope();
       setEstado('Falta el código del evento. Escaneá el QR de la cabina.');
+      estadoAlTope();
       gateVisible(false);
       show(el('galeria'), false);
       return;
@@ -316,8 +318,8 @@
     getEvento(state.slug).then(function (evento) {
       if (!evento) {
         // 404 manejado: mensaje claro, sin excepción en consola.
-        estadoAlTope();
         setEstado('No encontramos ese evento. Revisá el link del QR.');
+        estadoAlTope();
         gateVisible(false);
         show(el('galeria'), false);
         return;
@@ -336,8 +338,8 @@
       else gateVisible(true);
     }).catch(function (err) {
       console.error('[selfie-album]', err);
-      estadoAlTope();
       setEstado('No pudimos cargar el evento. Recargá la página.');
+      estadoAlTope();
     });
   }
 
