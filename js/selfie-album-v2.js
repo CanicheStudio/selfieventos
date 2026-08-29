@@ -48,6 +48,10 @@
     var n = el('estado');
     var gate = el('gate');
     if (n && gate && gate.parentNode) gate.parentNode.insertBefore(n, gate.nextSibling);
+    // Medido en el E2E: aun mudado, el mensaje queda a ~1181px (hero de ~677px
+    // encima) — bajo el pliegue en 1440x900. El scroll es parte del fix, no un
+    // extra: sin el, "visible" solo es cierto para quien scrollea a ciegas.
+    if (n) n.scrollIntoView({ block: 'center' });
   }
 
   /* ───────────────────────────── datos (Worker) ───────────────────────────── */
