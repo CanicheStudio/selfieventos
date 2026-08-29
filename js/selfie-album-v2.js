@@ -41,6 +41,15 @@
     if (msg) console.info('[selfie-album]', msg);
   }
 
+  function estadoAlTope() {
+    // Errores de pagina (sin evento valido): el nodo estado vive junto a la
+    // galeria, fuera del viewport inicial. Se muda junto al gate para que el
+    // mensaje se vea sin scroll. Mover un nodo existente no es crear HTML.
+    var n = el('estado');
+    var gate = el('gate');
+    if (n && gate && gate.parentNode) gate.parentNode.insertBefore(n, gate.nextSibling);
+  }
+
   /* ───────────────────────────── datos (Worker) ───────────────────────────── */
 
   function getEvento(slug) {
@@ -90,6 +99,11 @@
     var clon = form.cloneNode(true);
     form.parentNode.replaceChild(clon, form);
     form = clon;
+    // El handler de Webflow Forms vive en document, delegado con el selector
+    // ".w-form form" (medido en la pasada final del E2E): sin la clase en el
+    // wrapper, el submit ya no matchea y no hay doble captura del lead.
+    var wfWrapper = form.closest('.w-form');
+    if (wfWrapper) wfWrapper.classList.remove('w-form');
     var input = form.querySelector('[data-selfie="gate-email"]') || el('gate-email');
     if (!input) return;
 
@@ -288,6 +302,7 @@
     state.slug = params.get('evento');
 
     if (!state.slug) {
+      estadoAlTope();
       setEstado('Falta el código del evento. Escaneá el QR de la cabina.');
       gateVisible(false);
       show(el('galeria'), false);
@@ -297,6 +312,7 @@
     getEvento(state.slug).then(function (evento) {
       if (!evento) {
         // 404 manejado: mensaje claro, sin excepción en consola.
+        estadoAlTope();
         setEstado('No encontramos ese evento. Revisá el link del QR.');
         gateVisible(false);
         show(el('galeria'), false);
@@ -316,6 +332,7 @@
       else gateVisible(true);
     }).catch(function (err) {
       console.error('[selfie-album]', err);
+      estadoAlTope();
       setEstado('No pudimos cargar el evento. Recargá la página.');
     });
   }
