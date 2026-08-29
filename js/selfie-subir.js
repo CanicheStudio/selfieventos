@@ -28,7 +28,17 @@
 
   function setEstado(msg, esError) {
     var n = el('estado');
-    if (n) { n.textContent = msg; show(n, !!msg); n.setAttribute('data-error', esError ? '1' : '0'); }
+    if (n) {
+      // El nodo puede quedar dentro de la seccion OCULTA (gate vs app): un
+      // "PIN incorrecto" escrito en un contenedor display:none es invisible
+      // (bug real: Cani no veia ningun error al fallar el PIN, 2026-08-29).
+      // Se muda al contenedor visible antes de escribir.
+      var gate = el('pin-gate');
+      var app = el('app');
+      var visible = (gate && gate.style.display !== 'none') ? gate : app;
+      if (visible && n.parentElement !== visible) visible.appendChild(n);
+      n.textContent = msg; show(n, !!msg); n.setAttribute('data-error', esError ? '1' : '0');
+    }
     if (msg) (esError ? console.warn : console.info)('[selfie-subir]', msg);
   }
 
