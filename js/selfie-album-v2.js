@@ -254,8 +254,12 @@
   }
 
   function render() {
-    var cont = el('grid');
-    if (!cont) return;
+    var hooked = el('grid');
+    if (!hooked) return;
+    // Las columnas de Lumos viven en la .u-grid INTERNA del wrapper: se inyecta
+    // adentro de ella. Vaciar el wrapper la mataba y las cards quedaban
+    // apiladas a lo ancho (medido en prod: card de 1133px en grid de 1133px).
+    var cont = hooked.querySelector('.u-grid') || hooked;
     var tpl = cardTpl();   // capturar ANTES de vaciar el grid (el template vive adentro)
     cont.innerHTML = '';
     var fotos = state.fotos[state.tab] || [];
