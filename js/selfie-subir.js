@@ -189,6 +189,17 @@
     }
   }
 
+  function initFecha() {
+    // A13: click/focus en cualquier parte del campo fecha abre el calendario
+    // directo. showPicker() requiere user-gesture y no existe en browsers
+    // viejos → try/catch con fallback silencioso al comportamiento nativo.
+    var fecha = el('nuevo-fecha');
+    if (!fecha || typeof fecha.showPicker !== 'function') return;
+    var abrirCalendario = function () { try { fecha.showPicker(); } catch (e) {} };
+    fecha.addEventListener('focus', abrirCalendario);
+    fecha.addEventListener('click', abrirCalendario);
+  }
+
   /* ─────────────────────── tipo (Fotos / Tiras) + upload ─────────────────── */
 
   function initTipo() {
@@ -260,6 +271,7 @@
   function init() {
     initPin();
     initEventoNuevo();
+    initFecha();
     initTipo();
     initUpload();
   }
