@@ -234,7 +234,7 @@
         tags: [tag],
         sources: ['local', 'camera'],
         multiple: true,
-        maxFiles: 30,
+        maxFiles: 300,
         language: 'es',
         text: { es: { or: 'o', menu: { files: 'Mis fotos', camera: 'Cámara' } } }
       }, function (error, result) {
