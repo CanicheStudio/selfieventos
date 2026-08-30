@@ -278,11 +278,23 @@
   function abrirLightbox(idx) {
     var lb = el('lightbox'), img = el('lightbox-img');
     if (!lb || !img) return;
+    // El Visual Image de Lumos bindea el atributo en el div wrapper, no en el
+    // <img> interno — la foto se escribe siempre sobre un <img> real.
+    if (img.tagName !== 'IMG') img = img.querySelector('img');
+    if (!img) return;
+    // El Modal de Lumos es un <dialog> nativo: se abre/cierra con la API del
+    // dialog, y el cierre puede llegar por afuera (X, backdrop, Esc de Lumos)
+    // → la limpieza se cuelga del evento 'close', no del camino de salida.
+    var esDialog = lb.tagName === 'DIALOG' && typeof lb.showModal === 'function';
     var fotos = state.fotos[state.tab] || [];
     var i = idx;
 
     function pintar() { img.src = CFG.fotoUrl(fotos[i].public_id, 'q_auto,f_auto'); }
-    function cerrar() { show(lb, false); document.removeEventListener('keydown', teclas); }
+    function limpiar() { document.removeEventListener('keydown', teclas); }
+    function cerrar() {
+      if (esDialog) { if (lb.open) lb.close(); }
+      else { show(lb, false); limpiar(); }
+    }
     function teclas(ev) {
       if (ev.key === 'Escape') cerrar();
       else if (ev.key === 'ArrowRight') { i = (i + 1) % fotos.length; pintar(); }
@@ -290,7 +302,12 @@
     }
 
     pintar();
-    show(lb, true);
+    if (esDialog) {
+      lb.addEventListener('close', limpiar, { once: true });
+      lb.showModal();
+    } else {
+      show(lb, true);
+    }
     document.addEventListener('keydown', teclas);
     var close = el('lightbox-close');
     if (close) close.onclick = cerrar;
