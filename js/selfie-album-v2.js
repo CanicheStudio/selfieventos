@@ -529,8 +529,32 @@
     state.slug = params.get('evento');
 
     if (!state.slug) {
-      setEstado('Falta el código del evento. Escaneá el QR de la cabina.');
-      estadoAlTope();
+      // A12: sin ?evento= en la URL, la salida es la form de código de Cani
+      // (con guarda: sin la pieza, el mensaje de estado actual queda intacto).
+      var codigoForm = el('codigo-form');
+      if (codigoForm) {
+        // Mismo saneo que el gate: webflow.js delega su submit en
+        // '.w-form form' (POST a Webflow Forms, 50/mes en plan free) — el
+        // clon suelta listeners directos y sin la clase no matchea el delegado.
+        var clonForm = codigoForm.cloneNode(true);
+        codigoForm.parentNode.replaceChild(clonForm, codigoForm);
+        codigoForm = clonForm;
+        var wfWrap = codigoForm.closest('.w-form');
+        if (wfWrap) wfWrap.classList.remove('w-form');
+
+        show(codigoForm, true);
+        codigoForm.addEventListener('submit', function (ev) {
+          ev.preventDefault();
+          var input = codigoForm.querySelector('[data-selfie="codigo-input"]') || el('codigo-input');
+          var valor = input ? (input.value || '').trim() : '';
+          if (!valor) return;
+          // La validación ya existe: slug inválido → 404 → mensaje de error actual.
+          window.location.search = '?evento=' + encodeURIComponent(valor);
+        });
+      } else {
+        setEstado('Falta el código del evento. Escaneá el QR de la cabina.');
+        estadoAlTope();
+      }
       gateVisible(false);
       show(el('galeria'), false);
       return;
