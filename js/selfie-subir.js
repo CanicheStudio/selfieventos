@@ -244,7 +244,14 @@
     var t = el('exito-texto');
     if (t) nodoTexto(t).textContent = texto;
     var ver = el('exito-ver-album');
-    if (ver) ver.setAttribute('href', '/album?evento=' + encodeURIComponent(state.slug));
+    if (ver) {
+      // El Button Main de Lumos bindea el attr en el div wrapper: el href real
+      // va en el <a> interno; si el clickable es <button>, se navega por click.
+      var destino = '/album?evento=' + encodeURIComponent(state.slug);
+      var verLink = ver.tagName === 'A' ? ver : ver.querySelector('a');
+      if (verLink) verLink.setAttribute('href', destino);
+      else ver.onclick = function () { window.location.href = destino; };
+    }
     setEstado('');
     abrirModal(modal);
   }
