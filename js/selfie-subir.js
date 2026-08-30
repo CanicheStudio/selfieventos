@@ -278,9 +278,10 @@
   function actualizarDestino() {
     var n = el('destino');
     if (!n) return;
-    if (!state.slug) { n.textContent = 'Elegí un evento para poder subir.'; return; }
+    var t = nodoTexto(n);   // el texto cae en el nodo interno de la pieza de Cani
+    if (!state.slug) { t.textContent = 'Elegí un evento para poder subir.'; return; }
     var ev = state.eventos.filter(function (e) { return e.slug === state.slug; })[0];
-    n.textContent = 'Subiendo a: ' + ((ev && ev.nombre) || state.slug) +
+    t.textContent = 'Subiendo a: ' + ((ev && ev.nombre) || state.slug) +
       ' · ' + (state.tipo === 'tira' ? 'Tiras' : 'Fotos');
   }
 

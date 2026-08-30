@@ -585,10 +585,12 @@
         return;
       }
       state.evento = evento;
+      // RichText de Cani: el texto cae en el nodo interno (nodoTexto), no en
+      // el contenedor — un write directo volaría el <p> y su estilo de párrafo.
       var titulo = el('evento-nombre');
-      if (titulo) titulo.textContent = evento.nombre;
+      if (titulo) nodoTexto(titulo).textContent = evento.nombre;
       var lugar = el('evento-lugar');
-      if (lugar && evento.lugar) lugar.textContent = evento.lugar;
+      if (lugar && evento.lugar) nodoTexto(lugar).textContent = evento.lugar;
 
       initGate();
       initTabs();
