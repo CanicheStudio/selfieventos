@@ -67,12 +67,14 @@
 
   function validarPin(pin) {
     // Se valida contra el SERVER (no hay comparación de PIN en el front).
-    // Sonda barata: un POST inválido a propósito distingue 401 de 400.
+    // Sonda: GET /panel con el PIN → 200 si es válido (el HTML se descarta).
+    // C3: la sonda vieja (POST inválido a propósito) hacía que el caso ESPERADO
+    // fuera un 400, y el browser pinta TODO 4xx en rojo en consola aunque el JS
+    // lo maneje — no se puede suprimir desde el código. Con /panel la carga
+    // normal queda limpia; el 4xx rojo queda solo para el PIN realmente malo.
     setEstado('Validando…');
-    fetch(CFG.api('/api/eventos'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Selfie-Pin': pin },
-      body: JSON.stringify({})   // sin nombre => 400 si el PIN es correcto
+    fetch(CFG.api('/panel'), {
+      headers: { 'X-Selfie-Pin': pin }
     }).then(function (r) {
       if (r.status === 401) {
         setEstado('PIN incorrecto.', true);
@@ -83,7 +85,8 @@
         return;
       }
       if (r.status === 429) { setEstado('Demasiados intentos. Esperá un minuto.', true); return; }
-      // 400 = PIN válido, payload vacío (esperado).
+      if (!r.ok) { setEstado('No se pudo validar el PIN. Probá de nuevo.', true); return; }
+      // 200 = PIN válido.
       state.pin = pin;
       try { window.localStorage.setItem(LS_PIN, pin); } catch (e) {}
       setEstado('');
