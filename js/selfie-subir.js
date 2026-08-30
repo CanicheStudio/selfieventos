@@ -228,8 +228,23 @@
     var btn = el('subir-btn');
     if (!btn) return;
 
+    // A1: mientras el widget carga su iframe no pasa nada visible (segundos en
+    // el celular de Fer) → estado observable en el botón, sin timers: se
+    // restaura con el primer display-changed del widget (o ante un error).
+    var textoOriginal = btn.textContent;
+    var abriendo = false;
+    function botonEsperando(on) {
+      abriendo = on;
+      if ('disabled' in btn) btn.disabled = on;
+      if (on) btn.setAttribute('disabled', '');
+      else btn.removeAttribute('disabled');
+      btn.textContent = on ? 'Abriendo el selector…' : textoOriginal;
+    }
+
     btn.addEventListener('click', function (ev) {
       ev.preventDefault();
+      // El atributo disabled no frena clicks si el botón es un <a> → guarda propia.
+      if (abriendo) return;
 
       // Bloqueo explícito: sin evento no se sube (si no, las fotos caen en un
       // tag que ningún álbum pide y se pierden sin que nadie se entere).
@@ -239,6 +254,8 @@
         console.error('[selfie-subir] falta el widget de Cloudinary');
         return;
       }
+
+      botonEsperando(true);
 
       var tag = CFG.tagFor(state.slug, state.tipo);   // contrato compartido con el Worker
       var widget = window.cloudinary.createUploadWidget({
@@ -253,9 +270,14 @@
         text: { es: { or: 'o', menu: { files: 'Mis fotos', camera: 'Cámara' } } }
       }, function (error, result) {
         if (error) {
+          botonEsperando(false);
           console.error('[selfie-subir]', error);
           setEstado('Hubo un problema al subir. Probá de nuevo.', true);
           return;
+        }
+        if (result && result.event === 'display-changed') {
+          // El widget ya se mostró (o cambió de estado): el botón vuelve solo.
+          botonEsperando(false);
         }
         if (result && result.event === 'success') {
           setEstado('Subida: ' + (result.info && result.info.original_filename ? result.info.original_filename : 'foto'));
