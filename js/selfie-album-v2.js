@@ -285,14 +285,33 @@
     var cont = el('contador');
     if (cont) cont.textContent = n ? (n + ' seleccionada' + (n > 1 ? 's' : '')) : '';
     show(el('barra'), n > 0);
+    actualizarSeleccionarTodo();
+  }
+
+  function todasSeleccionadas() {
+    var fotos = state.fotos[state.tab] || [];
+    return fotos.length > 0 && fotos.every(function (f) { return !!state.sel[f.public_id]; });
+  }
+
+  function actualizarSeleccionarTodo() {
+    // A9: el label acompaña al toggle SOLO si el botón es texto simple (sin
+    // hijos). Si es un component de Lumos con estructura propia, el texto es
+    // de Cani y no se toca — queda el comportamiento.
+    var todo = el('seleccionar-todo');
+    if (!todo || todo.children.length > 0) return;
+    todo.textContent = todasSeleccionadas() ? 'Quitar selección' : 'Seleccionar todas';
   }
 
   function initAcciones() {
     var todo = el('seleccionar-todo');
     if (todo) {
+      // A9: toggle — con todo ya seleccionado, deselecciona todo (y la barra
+      // se oculta sola vía actualizarBarra dentro de render).
       todo.addEventListener('click', function (ev) {
         ev.preventDefault();
-        (state.fotos[state.tab] || []).forEach(function (f) { state.sel[f.public_id] = f; });
+        var fotos = state.fotos[state.tab] || [];
+        if (todasSeleccionadas()) fotos.forEach(function (f) { delete state.sel[f.public_id]; });
+        else fotos.forEach(function (f) { state.sel[f.public_id] = f; });
         render();
       });
     }
