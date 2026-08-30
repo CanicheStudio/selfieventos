@@ -283,6 +283,9 @@
           setEstado('Subida: ' + (result.info && result.info.original_filename ? result.info.original_filename : 'foto'));
         }
         if (result && result.event === 'queues-end') {
+          // A2: la tanda terminó, el widget sobra. quiet: sin confirmación
+          // (la cola ya está vacía, no se aborta nada).
+          widget.close({ quiet: true });
           setEstado('¡Listo! Ya podés verlas en el álbum del evento.');
         }
       });
