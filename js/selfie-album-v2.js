@@ -286,13 +286,20 @@
     // dialog, y el cierre puede llegar por afuera (X, backdrop, Esc de Lumos)
     // → la limpieza se cuelga del evento 'close', no del camino de salida.
     var esDialog = lb.tagName === 'DIALOG' && typeof lb.showModal === 'function';
+    // El Modal de Lumos anima backdrop/content con GSAP: showModal() pelado lo
+    // abre invisible y close() directo no restaura el scroll del body — se usa
+    // su API pública (window.lumos.modal) cuando está, con fallback al dialog.
+    var modalId = lb.getAttribute('data-modal-target');
+    var lumosModal = window.lumos && window.lumos.modal && window.lumos.modal.list &&
+      modalId && window.lumos.modal.list[modalId];
     var fotos = state.fotos[state.tab] || [];
     var i = idx;
 
     function pintar() { img.src = CFG.fotoUrl(fotos[i].public_id, 'q_auto,f_auto'); }
     function limpiar() { document.removeEventListener('keydown', teclas); }
     function cerrar() {
-      if (esDialog) { if (lb.open) lb.close(); }
+      if (lumosModal) lumosModal.close();
+      else if (esDialog) { if (lb.open) lb.close(); }
       else { show(lb, false); limpiar(); }
     }
     function teclas(ev) {
@@ -303,8 +310,10 @@
 
     pintar();
     if (esDialog) {
+      // resetModal de Lumos también cierra vía dialog.close() → dispara 'close'
       lb.addEventListener('close', limpiar, { once: true });
-      lb.showModal();
+      if (lumosModal) lumosModal.open();
+      else lb.showModal();
     } else {
       show(lb, true);
     }
