@@ -35,9 +35,17 @@
 
   function show(node, on) { if (node) node.style.display = on ? '' : 'none'; }
 
+  // Los Blocks hookeados de Cani pueden traer el nodo de texto ADENTRO
+  // (Paragraph dentro del Block con el hook): textContent sobre el contenedor
+  // pisaría ese párrafo — se escribe sobre el nodo interno si existe, análogo
+  // al querySelector('img') del lightbox (directiva Cani 2026-08-30).
+  function nodoTexto(n) {
+    return n ? (n.querySelector('p,[class*="u-text"]') || n) : null;
+  }
+
   function setEstado(msg) {
     var n = el('estado');
-    if (n) { n.textContent = msg; show(n, !!msg); }
+    if (n) { nodoTexto(n).textContent = msg; show(n, !!msg); }
     if (msg) console.info('[selfie-album]', msg);
   }
 
@@ -283,7 +291,7 @@
   function actualizarBarra() {
     var n = Object.keys(state.sel).length;
     var cont = el('contador');
-    if (cont) cont.textContent = n ? (n + ' seleccionada' + (n > 1 ? 's' : '')) : '';
+    if (cont) nodoTexto(cont).textContent = n ? (n + ' seleccionada' + (n > 1 ? 's' : '')) : '';
     show(el('barra'), n > 0);
     actualizarSeleccionarTodo();
   }
@@ -294,12 +302,14 @@
   }
 
   function actualizarSeleccionarTodo() {
-    // A9: el label acompaña al toggle SOLO si el botón es texto simple (sin
-    // hijos). Si es un component de Lumos con estructura propia, el texto es
-    // de Cani y no se toca — queda el comportamiento.
+    // A9: el label acompaña al toggle si el botón es texto simple o si trae su
+    // nodo de texto interno reconocible (p / u-text). Component con estructura
+    // sin nodo de texto identificable: el texto es de Cani y no se toca.
     var todo = el('seleccionar-todo');
-    if (!todo || todo.children.length > 0) return;
-    todo.textContent = todasSeleccionadas() ? 'Quitar selección' : 'Seleccionar todas';
+    if (!todo) return;
+    var t = todo.querySelector('p,[class*="u-text"]');
+    if (!t && todo.children.length > 0) return;
+    (t || todo).textContent = todasSeleccionadas() ? 'Quitar selección' : 'Seleccionar todas';
   }
 
   function initAcciones() {
@@ -359,7 +369,7 @@
     var progTexto = el('progreso-texto');
     var total = fotos.length, bajadas = 0;
     function pintarProgreso() {
-      if (progTexto) progTexto.textContent =
+      if (progTexto) nodoTexto(progTexto).textContent =
         'Preparando tu descarga… (' + bajadas + ' de ' + total + ' fotos)';
     }
     if (modal) { pintarProgreso(); abrirModal(modal); }
@@ -444,7 +454,12 @@
       if (!btnSel || !fotos[i]) return;
       var on = !!state.sel[fotos[i].public_id];
       btnSel.classList.toggle('is-selected', on);
-      if (btnSel.children.length === 0) btnSel.textContent = on ? 'Seleccionada' : 'Seleccionar';
+      // Texto: sobre el nodo interno (p / u-text) si existe; texto simple si
+      // no tiene hijos; component sin nodo reconocible: solo la clase.
+      var t = btnSel.querySelector('p,[class*="u-text"]');
+      if (t || btnSel.children.length === 0) {
+        (t || btnSel).textContent = on ? 'Seleccionada' : 'Seleccionar';
+      }
     }
 
     function pintar() {

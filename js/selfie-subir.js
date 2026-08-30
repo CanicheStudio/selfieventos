@@ -26,6 +26,14 @@
   var el = function (attr) { return document.querySelector('[data-selfie="' + attr + '"]'); };
   function show(n, on) { if (n) n.style.display = on ? '' : 'none'; }
 
+  // Los Blocks hookeados de Cani pueden traer el nodo de texto ADENTRO
+  // (Paragraph dentro del Block con el hook): textContent sobre el contenedor
+  // pisaría ese párrafo — se escribe sobre el nodo interno si existe
+  // (directiva Cani 2026-08-30, análogo al querySelector('img') del lightbox).
+  function nodoTexto(n) {
+    return n ? (n.querySelector('p,[class*="u-text"]') || n) : null;
+  }
+
   function setEstado(msg, esError) {
     var n = el('estado');
     if (n) {
@@ -37,7 +45,7 @@
       var app = el('app');
       var visible = (gate && gate.style.display !== 'none') ? gate : app;
       if (visible && n.parentElement !== visible) visible.appendChild(n);
-      n.textContent = msg; show(n, !!msg); n.setAttribute('data-error', esError ? '1' : '0');
+      nodoTexto(n).textContent = msg; show(n, !!msg); n.setAttribute('data-error', esError ? '1' : '0');
     }
     if (msg) (esError ? console.warn : console.info)('[selfie-subir]', msg);
   }
@@ -234,7 +242,7 @@
       return;
     }
     var t = el('exito-texto');
-    if (t) t.textContent = texto;
+    if (t) nodoTexto(t).textContent = texto;
     var ver = el('exito-ver-album');
     if (ver) ver.setAttribute('href', '/album?evento=' + encodeURIComponent(state.slug));
     setEstado('');
@@ -283,14 +291,18 @@
     // A1: mientras el widget carga su iframe no pasa nada visible (segundos en
     // el celular de Fer) → estado observable en el botón, sin timers: se
     // restaura con el primer display-changed del widget (o ante un error).
-    var textoOriginal = btn.textContent;
+    // El texto va al nodo interno del botón si lo hay; en un component con
+    // estructura sin nodo de texto reconocible, solo disabled (no se pisa).
+    var btnTexto = btn.querySelector('p,[class*="u-text"]');
+    if (!btnTexto && btn.children.length === 0) btnTexto = btn;
+    var textoOriginal = btnTexto ? btnTexto.textContent : '';
     var abriendo = false;
     function botonEsperando(on) {
       abriendo = on;
       if ('disabled' in btn) btn.disabled = on;
       if (on) btn.setAttribute('disabled', '');
       else btn.removeAttribute('disabled');
-      btn.textContent = on ? 'Abriendo el selector…' : textoOriginal;
+      if (btnTexto) btnTexto.textContent = on ? 'Abriendo el selector…' : textoOriginal;
     }
 
     // A3: "Subir más" cierra el modal de éxito (pieza de Cani, con guarda).
