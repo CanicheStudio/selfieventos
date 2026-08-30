@@ -329,8 +329,17 @@
       .then(function (res) {
         state.fotos.suelta = res[0];
         state.fotos.tira = res[1];
-        // La tab Tiras solo existe si hay tiras (regla de negocio heredada).
-        show(el('tab-tira'), state.fotos.tira.length > 0);
+        // A7: con un solo tipo con fotos las tabs sobran — se ocultan LAS DOS
+        // (una tab solitaria no elige nada). Si Cani envuelve las tabs en una
+        // fila propia, ocultar ambos links equivale a ocultar la fila.
+        var haySueltas = state.fotos.suelta.length > 0;
+        var hayTiras = state.fotos.tira.length > 0;
+        var ambas = haySueltas && hayTiras;
+        show(el('tab-suelta'), ambas);
+        show(el('tab-tira'), ambas);
+        // Sin tabs a la vista, la activa DEBE ser la que tiene fotos (si no,
+        // un evento solo-tiras quedaría clavado en "no hay fotos" sin salida).
+        if (!ambas && hayTiras) state.tab = 'tira';
         render();
         marcarTab();
       })
