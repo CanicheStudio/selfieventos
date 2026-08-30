@@ -189,6 +189,58 @@
     }
   }
 
+  /* ─────────────── modales de Lumos (piezas de Cani, con guarda) ─────────── */
+
+  // Mismo patrón que el lightbox del álbum: API pública de Lumos si está
+  // (anima con GSAP y restaura el scroll), <dialog> nativo como fallback.
+  function lumosModalApi(node) {
+    var id = node && node.getAttribute('data-modal-target');
+    return (id && window.lumos && window.lumos.modal && window.lumos.modal.list &&
+      window.lumos.modal.list[id]) || null;
+  }
+
+  function abrirModal(node) {
+    if (!node) return;
+    var api = lumosModalApi(node);
+    if (api) api.open();
+    else if (node.tagName === 'DIALOG' && typeof node.showModal === 'function') { if (!node.open) node.showModal(); }
+    else show(node, true);
+  }
+
+  function cerrarModal(node) {
+    if (!node) return;
+    var api = lumosModalApi(node);
+    if (api) api.close();
+    else if (node.tagName === 'DIALOG') { if (node.open) node.close(); }
+    else show(node, false);
+  }
+
+  function nombreEvento() {
+    var ev = state.eventos.filter(function (e) { return e.slug === state.slug; })[0];
+    return (ev && ev.nombre) || state.slug || 'tu evento';
+  }
+
+  // A3: resultado REAL de la tanda en el modal de éxito de Cani. Caso negativo
+  // incluido: con errores nunca se muestra un "✓ éxito" pleno. Sin la pieza,
+  // fallback al mensaje de estado (comportamiento previo).
+  function mostrarResultado(subidas, fallidas) {
+    var texto = fallidas
+      ? (subidas + ' subida' + (subidas === 1 ? '' : 's') + ', ' + fallidas +
+         ' con error — probá de nuevo las que fallaron')
+      : (subidas + ' foto' + (subidas === 1 ? ' subida' : 's subidas') + ' a ' + nombreEvento());
+    var modal = el('exito');
+    if (!modal) {
+      setEstado(fallidas ? texto : '¡Listo! Ya podés verlas en el álbum del evento.', fallidas > 0);
+      return;
+    }
+    var t = el('exito-texto');
+    if (t) t.textContent = texto;
+    var ver = el('exito-ver-album');
+    if (ver) ver.setAttribute('href', '/album?evento=' + encodeURIComponent(state.slug));
+    setEstado('');
+    abrirModal(modal);
+  }
+
   function initFecha() {
     // A13: click/focus en cualquier parte del campo fecha abre el calendario
     // directo. showPicker() requiere user-gesture y no existe en browsers
@@ -241,6 +293,15 @@
       btn.textContent = on ? 'Abriendo el selector…' : textoOriginal;
     }
 
+    // A3: "Subir más" cierra el modal de éxito (pieza de Cani, con guarda).
+    var subirMas = el('exito-subir-mas');
+    if (subirMas) {
+      subirMas.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        cerrarModal(el('exito'));
+      });
+    }
+
     btn.addEventListener('click', function (ev) {
       ev.preventDefault();
       // El atributo disabled no frena clicks si el botón es un <a> → guarda propia.
@@ -256,6 +317,9 @@
       }
 
       botonEsperando(true);
+      // A3: conteo por tanda desde los callbacks (el widget se crea por click,
+      // así que los contadores arrancan en cero solos).
+      var subidas = 0, fallidas = 0;
 
       var tag = CFG.tagFor(state.slug, state.tipo);   // contrato compartido con el Worker
       var widget = window.cloudinary.createUploadWidget({
@@ -270,6 +334,7 @@
         text: { es: { or: 'o', menu: { files: 'Mis fotos', camera: 'Cámara' } } }
       }, function (error, result) {
         if (error) {
+          fallidas += 1;
           botonEsperando(false);
           console.error('[selfie-subir]', error);
           setEstado('Hubo un problema al subir. Probá de nuevo.', true);
@@ -280,13 +345,15 @@
           botonEsperando(false);
         }
         if (result && result.event === 'success') {
+          subidas += 1;
           setEstado('Subida: ' + (result.info && result.info.original_filename ? result.info.original_filename : 'foto'));
         }
         if (result && result.event === 'queues-end') {
           // A2: la tanda terminó, el widget sobra. quiet: sin confirmación
           // (la cola ya está vacía, no se aborta nada).
           widget.close({ quiet: true });
-          setEstado('¡Listo! Ya podés verlas en el álbum del evento.');
+          // Con 0 y 0 no hay nada que anunciar (queues-end sin archivos).
+          if (subidas + fallidas > 0) mostrarResultado(subidas, fallidas);
         }
       });
       widget.open();
