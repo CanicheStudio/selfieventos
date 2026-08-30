@@ -159,6 +159,63 @@
 
   /* ─────────────────────────────── galería ───────────────────────────────── */
 
+  function toggleSeleccion(foto) {
+    if (state.sel[foto.public_id]) delete state.sel[foto.public_id];
+    else state.sel[foto.public_id] = foto;
+    actualizarBarra();
+  }
+
+  // A8: la card de foto es un componente de CANI (§2 de la spec): el template
+  // vive OCULTO dentro del grid con data-selfie="card-template". Se captura
+  // UNA vez y se saca del DOM — así render() puede vaciar el grid sin matarlo,
+  // y el template nunca se muestra ni se cuenta como foto.
+  var tplCard = null;
+  function cardTpl() {
+    if (tplCard) return tplCard;
+    var cont = el('grid');
+    var t = cont && cont.querySelector('[data-selfie="card-template"]');
+    if (t) { t.parentNode.removeChild(t); tplCard = t; }
+    return tplCard;
+  }
+
+  function refrescarCard(card, foto) {
+    // Estado "seleccionada" = clase is-selected (check tildado + border, CSS de Cani).
+    card.classList.toggle('is-selected', !!state.sel[foto.public_id]);
+  }
+
+  function fotoNodoDesdeTemplate(tpl, foto, idx) {
+    var card = tpl.cloneNode(true);
+    card.removeAttribute('data-selfie');   // el clon es una card, no el template
+    card.style.display = '';               // por si el template se oculta inline
+    card.setAttribute('data-idx', String(idx));
+
+    // El Visual Image de Lumos bindea el atributo en el wrapper: la foto se
+    // escribe siempre sobre el <img> real (mismo criterio que el lightbox).
+    var img = card.tagName === 'IMG' ? card : card.querySelector('img');
+    if (img) {
+      img.loading = 'lazy';
+      img.alt = state.evento ? ('Foto de ' + state.evento.nombre) : 'Foto del evento';
+      img.src = CFG.fotoUrl(foto.public_id, 'c_fill,w_400,q_auto,f_auto');
+      img.addEventListener('click', function () { abrirLightbox(idx); });
+    }
+
+    var check = card.querySelector('[data-selfie="card-check"]');
+    if (check) {
+      check.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();   // que el check no abra el visor
+        toggleSeleccion(foto);
+        refrescarCard(card, foto);
+      });
+    }
+
+    refrescarCard(card, foto);
+    return card;
+  }
+
+  // TODO(§2): cuando la card template exista en el Designer y esté VERIFICADA,
+  // este fabricador de UI por createElement (y sus estilos) se elimina.
+  // Hasta entonces es el fallback que mantiene el álbum vivo.
   function fotoNodo(foto, idx) {
     var wrap = document.createElement('div');
     wrap.className = 'selfie_foto_item';
@@ -191,6 +248,7 @@
   function render() {
     var cont = el('grid');
     if (!cont) return;
+    var tpl = cardTpl();   // capturar ANTES de vaciar el grid (el template vive adentro)
     cont.innerHTML = '';
     var fotos = state.fotos[state.tab] || [];
 
@@ -201,7 +259,9 @@
       return;
     }
     setEstado('');
-    fotos.forEach(function (f, i) { cont.appendChild(fotoNodo(f, i)); });
+    fotos.forEach(function (f, i) {
+      cont.appendChild(tpl ? fotoNodoDesdeTemplate(tpl, f, i) : fotoNodo(f, i));
+    });
     actualizarBarra();
   }
 
