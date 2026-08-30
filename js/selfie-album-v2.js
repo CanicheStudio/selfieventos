@@ -394,6 +394,28 @@
 
   /* ─────────────────────────────── lightbox ──────────────────────────────── */
 
+  // A11: descarga de UNA foto con el FileSaver ya cargado para el ZIP (saveAs
+  // sobre blob — un <a download> cross-origin a Cloudinary lo ignora el browser).
+  function descargarFoto(foto) {
+    if (typeof window.saveAs === 'undefined') {
+      console.error('[selfie-album] falta FileSaver para descargar la foto');
+      setEstado('No se pudo preparar la descarga.');
+      return;
+    }
+    fetch(CFG.fotoUrl(foto.public_id, 'q_auto,f_auto'))
+      .then(function (r) {
+        if (!r.ok) throw new Error('foto http ' + r.status);
+        return r.blob();
+      })
+      .then(function (b) {
+        window.saveAs(b, foto.public_id.split('/').pop() + '.' + (foto.format || 'jpg'));
+      })
+      .catch(function (err) {
+        console.error('[selfie-album] descarga foto', err);
+        setEstado('No se pudo descargar la foto. Probá de nuevo.');
+      });
+  }
+
   function abrirLightbox(idx) {
     var lb = el('lightbox'), img = el('lightbox-img');
     if (!lb || !img) return;
@@ -414,7 +436,21 @@
     var fotos = state.fotos[state.tab] || [];
     var i = idx;
 
-    function pintar() { img.src = CFG.fotoUrl(fotos[i].public_id, 'q_auto,f_auto'); }
+    // A11: el botón "Seleccionar" del visor refleja el estado de la foto EN
+    // PANTALLA (cambia con las flechas) — clase is-selected siempre; texto
+    // solo si el botón es texto simple (component de Cani: no se toca).
+    var btnSel = el('lightbox-seleccionar');
+    function refrescarSeleccion() {
+      if (!btnSel || !fotos[i]) return;
+      var on = !!state.sel[fotos[i].public_id];
+      btnSel.classList.toggle('is-selected', on);
+      if (btnSel.children.length === 0) btnSel.textContent = on ? 'Seleccionada' : 'Seleccionar';
+    }
+
+    function pintar() {
+      img.src = CFG.fotoUrl(fotos[i].public_id, 'q_auto,f_auto');
+      refrescarSeleccion();
+    }
     function limpiar() { document.removeEventListener('keydown', teclas); }
     function cerrar() {
       if (lumosModal) lumosModal.close();
@@ -439,6 +475,26 @@
     document.addEventListener('keydown', teclas);
     var close = el('lightbox-close');
     if (close) close.onclick = cerrar;
+
+    // A11: acciones del visor (piezas de Cani, con guarda). onclick asignado
+    // (no addEventListener): abrirLightbox corre por apertura y los handlers
+    // deben PISARSE, no apilarse — mismo criterio que lightbox-close.
+    var descargar = el('lightbox-descargar');
+    if (descargar) {
+      descargar.onclick = function (ev) {
+        ev.preventDefault();
+        if (fotos[i]) descargarFoto(fotos[i]);
+      };
+    }
+    if (btnSel) {
+      btnSel.onclick = function (ev) {
+        ev.preventDefault();
+        if (!fotos[i]) return;
+        toggleSeleccion(fotos[i]);
+        refrescarSeleccion();
+        render();   // la card de la galería refleja el cambio sin cerrar el visor
+      };
+    }
   }
 
   /* ──────────────────────────────── arranque ─────────────────────────────── */
