@@ -319,6 +319,31 @@
     if (zip) zip.addEventListener('click', function (ev) { ev.preventDefault(); descargarZip(); });
   }
 
+  // Modales de Lumos (piezas de Cani, con guarda) — mismo patrón que el
+  // lightbox: API pública de Lumos si está (anima con GSAP y restaura el
+  // scroll), <dialog> nativo como fallback, display como último recurso.
+  function lumosModalApi(node) {
+    var id = node && node.getAttribute('data-modal-target');
+    return (id && window.lumos && window.lumos.modal && window.lumos.modal.list &&
+      window.lumos.modal.list[id]) || null;
+  }
+
+  function abrirModal(node) {
+    if (!node) return;
+    var api = lumosModalApi(node);
+    if (api) api.open();
+    else if (node.tagName === 'DIALOG' && typeof node.showModal === 'function') { if (!node.open) node.showModal(); }
+    else show(node, true);
+  }
+
+  function cerrarModal(node) {
+    if (!node) return;
+    var api = lumosModalApi(node);
+    if (api) api.close();
+    else if (node.tagName === 'DIALOG') { if (node.open) node.close(); }
+    else show(node, false);
+  }
+
   function descargarZip() {
     var fotos = Object.keys(state.sel).map(function (k) { return state.sel[k]; });
     if (!fotos.length) { setEstado('Elegí al menos una foto.'); return; }
@@ -328,7 +353,18 @@
       return;
     }
 
-    setEstado('Preparando tu descarga…');
+    // A10: progreso en el modal de Cani, actualizado por foto bajada. Sin la
+    // pieza en el Designer: el mensaje de estado de siempre.
+    var modal = el('progreso');
+    var progTexto = el('progreso-texto');
+    var total = fotos.length, bajadas = 0;
+    function pintarProgreso() {
+      if (progTexto) progTexto.textContent =
+        'Preparando tu descarga… (' + bajadas + ' de ' + total + ' fotos)';
+    }
+    if (modal) { pintarProgreso(); abrirModal(modal); }
+    else setEstado('Preparando tu descarga…');
+
     var zip = new window.JSZip();
     var pend = fotos.map(function (f) {
       return fetch(CFG.fotoUrl(f.public_id, 'q_auto,f_auto'))
@@ -336,6 +372,8 @@
         .then(function (b) {
           var nombre = f.public_id.split('/').pop() + '.' + (f.format || 'jpg');
           zip.file(nombre, b);
+          bajadas += 1;
+          pintarProgreso();
         });
     });
 
@@ -344,9 +382,11 @@
       .then(function (blob) {
         var base = (state.evento && state.evento.slug) || state.slug || 'fotos';
         window.saveAs(blob, 'selfie-' + base + '.zip');
+        cerrarModal(modal);   // guarda de nulo adentro
         setEstado('');
       })
       .catch(function (err) {
+        cerrarModal(modal);   // también en error: nunca un overlay clavado
         console.error('[selfie-album] zip', err);
         setEstado('No se pudo armar el ZIP. Probá de nuevo.');
       });
