@@ -330,8 +330,23 @@
         sources: ['local', 'camera'],
         multiple: true,
         maxFiles: 300,
+        // A5: solo imágenes — un .zip o video se rechaza en el picker, no
+        // después de subirlo ('image' es shortcut documentado del widget).
+        clientAllowedFormats: ['image'],
         language: 'es',
-        text: { es: { or: 'o', menu: { files: 'Mis fotos', camera: 'Cámara' } } }
+        text: { es: {
+          or: 'o',
+          menu: { files: 'Mis fotos', camera: 'Cámara' },
+          // A5: errores del widget en español. Claves verificadas contra el
+          // text.json oficial (uploader.errors.*) — no inventar claves acá.
+          uploader: { errors: {
+            allowed_formats: 'Ese archivo no es una imagen. Subí fotos JPG o PNG.',
+            max_number_of_files: 'Son demasiados archivos: hasta 300 por tanda.',
+            max_file_size: 'El archivo es demasiado pesado.',
+            min_file_size: 'El archivo es demasiado chico.',
+            file_too_large: 'El archivo ({{size}}) supera el máximo permitido ({{allowed}}).'
+          } }
+        } }
       }, function (error, result) {
         if (error) {
           fallidas += 1;
