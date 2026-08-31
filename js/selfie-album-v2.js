@@ -187,8 +187,15 @@
   }
 
   function refrescarCard(card, foto) {
-    // Estado "seleccionada" = clase is-selected (check tildado + border, CSS de Cani).
-    card.classList.toggle('is-selected', !!state.sel[foto.public_id]);
+    // Estado "seleccionada" = clase is-selected (border, CSS de Cani) + el tilde
+    // nativo del checkbox. El tilde se setea acá y no por el click del browser:
+    // el handler hace preventDefault (para que el check no abra el visor), lo que
+    // cancela el marcado nativo — y así el estado también queda correcto cuando
+    // la selección viene de "Seleccionar todas" o del visor.
+    var on = !!state.sel[foto.public_id];
+    card.classList.toggle('is-selected', on);
+    var input = card.querySelector('input[type="checkbox"]');
+    if (input) { input.checked = on; input.setAttribute('aria-checked', on ? 'true' : 'false'); }
   }
 
   function fotoNodoDesdeTemplate(tpl, foto, idx) {
