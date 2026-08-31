@@ -31,7 +31,11 @@
   // pisaría ese párrafo — se escribe sobre el nodo interno si existe
   // (directiva Cani 2026-08-30, análogo al querySelector('img') del lightbox).
   function nodoTexto(n) {
-    return n ? (n.querySelector('p,[class*="u-text"]') || n) : null;
+    // Los components de Lumos guardan el texto en un nodo interno propio
+    // (.button_main_text en Button Main, .u-text en Typography). Se apunta al
+    // nodo de TEXTO, nunca al contenedor (button_main_element envuelve tambien
+    // el icono: escribir ahi lo borraria).
+    return n ? (n.querySelector('p,[class*="u-text"],[class*="_text"]') || n) : null;
   }
 
   function setEstado(msg, esError) {

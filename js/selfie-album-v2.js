@@ -40,7 +40,11 @@
   // pisaría ese párrafo — se escribe sobre el nodo interno si existe, análogo
   // al querySelector('img') del lightbox (directiva Cani 2026-08-30).
   function nodoTexto(n) {
-    return n ? (n.querySelector('p,[class*="u-text"]') || n) : null;
+    // Los components de Lumos guardan el texto en un nodo interno propio
+    // (.button_main_text en Button Main, .u-text en Typography). Se apunta al
+    // nodo de TEXTO, nunca al contenedor (button_main_element envuelve tambien
+    // el icono: escribir ahi lo borraria).
+    return n ? (n.querySelector('p,[class*="u-text"],[class*="_text"]') || n) : null;
   }
 
   function setEstado(msg) {
@@ -374,6 +378,21 @@
       return;
     }
 
+    // A10: mientras arma el ZIP el botón queda deshabilitado — dos clicks
+    // seguidos disparaban dos armados (observado). El Button Main de Lumos es
+    // un div: se marca por atributo + clase y se ignora el click mientras dura.
+    var btnZip = el('descargar-zip');
+    function zipOcupado(on) {
+      if (!btnZip) return;
+      var real = btnZip.tagName === 'BUTTON' ? btnZip : btnZip.querySelector('button,a');
+      if (real && 'disabled' in real) real.disabled = on;
+      if (on) btnZip.setAttribute('aria-disabled', 'true');
+      else btnZip.removeAttribute('aria-disabled');
+      btnZip.classList.toggle('is-disabled', on);
+    }
+    if (btnZip && btnZip.getAttribute('aria-disabled') === 'true') return;  // ya está armando
+    zipOcupado(true);
+
     // A10: progreso en el modal de Cani, actualizado por foto bajada. Sin la
     // pieza en el Designer: el mensaje de estado de siempre.
     var modal = el('progreso');
@@ -405,11 +424,13 @@
         window.saveAs(blob, 'selfie-' + base + '.zip');
         cerrarModal(modal);   // guarda de nulo adentro
         setEstado('');
+        zipOcupado(false);
       })
       .catch(function (err) {
         cerrarModal(modal);   // también en error: nunca un overlay clavado
         console.error('[selfie-album] zip', err);
         setEstado('No se pudo armar el ZIP. Probá de nuevo.');
+        zipOcupado(false);
       });
   }
 
