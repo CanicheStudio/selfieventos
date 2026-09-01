@@ -154,12 +154,24 @@
   function asegurarSubmit(form) {
     if (!form || form.tagName !== 'FORM') return;
     Array.prototype.forEach.call(form.querySelectorAll('button'), function (b) {
-      if ((b.getAttribute('type') || 'submit').toLowerCase() === 'submit') return;
-      b.addEventListener('click', function (ev) {
-        ev.preventDefault();
-        if (typeof form.requestSubmit === 'function') form.requestSubmit();
-        else form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-      });
+      if ((b.getAttribute('type') || 'submit').toLowerCase() !== 'submit') {
+        b.addEventListener('click', function (ev) {
+          ev.preventDefault();
+          if (typeof form.requestSubmit === 'function') form.requestSubmit();
+          else form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        });
+      }
+      // El runtime de Webflow Forms (Turnstile) deshabilita el boton en su
+      // callback 'ready' cuando el challenge no entrega token, y gana la
+      // carrera contra el opt-out segun el timing de carga (medido en prod:
+      // disabled=true sin w-form-loading). Nuestros forms no son de Webflow:
+      // cualquier disabled que un tercero le ponga al boton se revierte.
+      if (typeof MutationObserver === 'function') {
+        new MutationObserver(function () {
+          if (b.disabled) { b.disabled = false; b.classList.remove('w-form-loading'); }
+        }).observe(b, { attributes: true, attributeFilter: ['disabled', 'class'] });
+      }
+      if (b.disabled) { b.disabled = false; b.classList.remove('w-form-loading'); }
     });
   }
 
