@@ -24,6 +24,26 @@
   'use strict';
 
   var CFG = window.SELFIE_CONFIG;
+
+  // Turnstile de Webflow Forms: el runtime nuevo deshabilita el submit de CADA
+  // form (disabled + w-form-loading) hasta tener token del challenge; si el
+  // challenge no responde, el boton queda muerto (medido en prod 2026-09-01,
+  // logica visible en webflow.js: `!s.is("[data-wf-no-turnstile]")`). Nuestros
+  // forms no usan Webflow Forms (los datos van al Worker): opt-out explicito,
+  // SOLO en forms hookeados nuestros, ANTES de que webflow.js inicialice
+  // (este script carga primero en el body). El boton se re-habilita por si
+  // este script llego a correr despues.
+  (function () {
+    var forms = document.querySelectorAll('form[data-selfie], [data-selfie] form');
+    Array.prototype.forEach.call(forms, function (f) {
+      f.setAttribute('data-wf-no-turnstile', '');
+      var w = f.closest('.w-form');
+      if (w) w.setAttribute('data-wf-no-turnstile', '');
+      var b = f.querySelector('button[type="submit"], input[type="submit"]');
+      if (b) { b.disabled = false; b.classList.remove('w-form-loading'); }
+    });
+  })();
+
   if (!CFG) { console.error('[selfie-album] falta selfie-config.js'); return; }
 
   var LS_EMAIL = 'selfie_email';
