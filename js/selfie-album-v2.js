@@ -226,8 +226,17 @@
       img.loading = 'lazy';
       img.alt = state.evento ? ('Foto de ' + state.evento.nombre) : 'Foto del evento';
       img.src = CFG.fotoUrl(foto.public_id, 'c_fill,w_400,q_auto,f_auto');
-      img.addEventListener('click', function () { abrirLightbox(idx, tab); });
     }
+
+    // Visor: el click va en la CARD entera, no en el <img> — la card de Cani
+    // trae un clickable_wrap u-cover-absolute (capa Lumos que tapa la foto y se
+    // come los clicks: medido en prod 2026-09-01, elementFromPoint sobre la foto
+    // devolvía la capa y el visor era inalcanzable). La zona del checkbox queda
+    // excluida: ahí manda la selección.
+    card.addEventListener('click', function (ev) {
+      if (ev.target.closest('label, input, [data-selfie="card-check"]')) return;
+      abrirLightbox(idx, tab);
+    });
 
     var check = card.querySelector('[data-selfie="card-check"]');
     if (check) {
@@ -314,12 +323,19 @@
   }
 
   function initTabs() {
-    // Lumos maneja el switch de paneles; acá solo se registra la tab activa,
-    // que la usan "Seleccionar todas" y el ZIP.
+    // Lumos maneja el switch de paneles; acá se registra la tab activa y se
+    // limpia la selección al cambiar (feedback Cani 2026-09-01: la selección
+    // no viaja entre tabs — quedaba gente "des-seleccionando" a mano).
+    function alCambiarTab(tab) {
+      if (state.tab === tab) return;   // re-click en la tab activa: no limpiar
+      state.tab = tab;
+      if (Object.keys(state.sel).length) { state.sel = {}; render(); }
+      marcarTab();
+    }
     var tSuelta = el('tab-suelta');
     var tTira = el('tab-tira');
-    if (tSuelta) tSuelta.addEventListener('click', function () { state.tab = 'suelta'; marcarTab(); });
-    if (tTira) tTira.addEventListener('click', function () { state.tab = 'tira'; marcarTab(); });
+    if (tSuelta) tSuelta.addEventListener('click', function () { alCambiarTab('suelta'); });
+    if (tTira) tTira.addEventListener('click', function () { alCambiarTab('tira'); });
   }
 
   function marcarTab() {
@@ -362,7 +378,9 @@
       todo.addEventListener('click', function (ev) {
         ev.preventDefault();
         var fotos = state.fotos[state.tab] || [];
-        if (todasSeleccionadas()) fotos.forEach(function (f) { delete state.sel[f.public_id]; });
+        // "Quitar selección" limpia TODO (no solo la tab activa) — coherente
+        // con que la selección ya no viaja entre tabs.
+        if (todasSeleccionadas()) state.sel = {};
         else fotos.forEach(function (f) { state.sel[f.public_id] = f; });
         render();
       });
