@@ -139,6 +139,24 @@
 
   /* ────────────────────────────── email gate ─────────────────────────────── */
 
+
+  // Los Button Main de Cani renderizan <button type="button"> (medido en
+  // /subir 2026-09-01): ese type NO dispara el submit del form, y los handlers
+  // escuchan 'submit' — click muerto. Cualquier boton interno que no sea
+  // type=submit pasa a disparar el submit con validacion nativa. Guard: si el
+  // Designer luego lo cambia a type=submit, no se engancha (evita el doble).
+  function asegurarSubmit(form) {
+    if (!form || form.tagName !== 'FORM') return;
+    Array.prototype.forEach.call(form.querySelectorAll('button'), function (b) {
+      if ((b.getAttribute('type') || 'submit').toLowerCase() === 'submit') return;
+      b.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        if (typeof form.requestSubmit === 'function') form.requestSubmit();
+        else form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      });
+    });
+  }
+
   function gateVisible(on) {
     show(el('gate'), on);
     show(el('galeria'), !on);
@@ -160,6 +178,7 @@
     if (wfWrapper) wfWrapper.classList.remove('w-form');
     var input = form.querySelector('[data-selfie="gate-email"]') || el('gate-email');
     if (!input) return;
+    asegurarSubmit(form);
 
     form.addEventListener('submit', function (ev) {
       ev.preventDefault();
