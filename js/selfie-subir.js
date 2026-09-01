@@ -376,6 +376,66 @@
       ' · ' + (state.tipo === 'tira' ? 'Tiras' : 'Fotos');
   }
 
+
+  /* ───────────────────────── borrar evento (Fer) ─────────────────────────── */
+
+  function initBorrar() {
+    var btn = el('borrar-evento-toggle');
+    if (!btn) return;
+    var t = nodoTexto(btn);
+    var textoOriginal = t ? t.textContent : '';
+    var armado = false;
+    var timer = null;
+    var borrando = false;
+
+    function desarmar() {
+      armado = false;
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (t) t.textContent = textoOriginal;
+    }
+
+    btn.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      if (borrando) return;
+      if (!state.slug) { setEstado('Primero elegí el evento a borrar.', true); return; }
+
+      // Confirmación de dos clicks (destructivo): el primero arma, el segundo
+      // dentro de los 6s ejecuta. Sin confirm() nativo (bloquea y es feo).
+      if (!armado) {
+        armado = true;
+        if (t) t.textContent = '¿Seguro? Borra el evento y TODAS sus fotos';
+        setEstado('Vas a borrar el evento y todas sus fotos. Tocá de nuevo para confirmar.', true);
+        timer = setTimeout(function () { desarmar(); setEstado(''); }, 6000);
+        return;
+      }
+
+      desarmar();
+      borrando = true;
+      setEstado('Borrando evento…');
+      fetch(CFG.api('/api/eventos/' + encodeURIComponent(state.slug)), {
+        method: 'DELETE',
+        headers: pinHeaders()
+      }).then(function (r) {
+        borrando = false;
+        if (r.status === 401) { setEstado('PIN inválido. Recargá la página.', true); return; }
+        if (r.status === 429) { setEstado('Demasiados intentos. Esperá un minuto.', true); return; }
+        if (r.status === 503 || r.status === 502) { setEstado('No se pudieron borrar las fotos. No se borró nada — probá de nuevo.', true); return; }
+        if (r.status === 404) { setEstado('Ese evento ya no existe.', true); return cargarEventos(); }
+        if (!r.ok) { setEstado('No se pudo borrar el evento.', true); return; }
+        return r.json().then(function (d) {
+          var n = (d.fotos_borradas ? (d.fotos_borradas.suelta + d.fotos_borradas.tira) : 0);
+          setEstado('Evento borrado: ' + (d.nombre || d.slug) + (n ? ' (' + n + ' foto' + (n === 1 ? '' : 's') + ' borradas)' : ''));
+          state.slug = null;
+          return cargarEventos().then(function () { actualizarDestino(); });
+        });
+      }).catch(function (err) {
+        borrando = false;
+        console.error('[selfie-subir]', err);
+        setEstado('No se pudo conectar. Revisá la señal.', true);
+      });
+    });
+  }
+
   function initUpload() {
     var btn = el('subir-btn');
     if (!btn) return;
@@ -487,6 +547,7 @@
     initEventoNuevo();
     initFecha();
     initTipo();
+    initBorrar();
     initUpload();
   }
 

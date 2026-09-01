@@ -24,7 +24,7 @@ function corsHeaders(env) {
   const origin = (env && env.ALLOWED_ORIGIN) || 'https://selfieeventos.webflow.io';
   return {
     'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Methods': 'GET,POST,PATCH,OPTIONS',
+    'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type,X-Selfie-Pin',
     'Vary': 'Origin'
   };
@@ -248,6 +248,65 @@ async function editarEvento(request, env, slug) {
   return json({ evento }, 200, env);
 }
 
+/**
+ * Borra TODOS los recursos de un tag vía Admin API. Mismo contrato tagFor que
+ * el listado. 404 de Cloudinary = tag sin recursos = 0 borradas, no error.
+ */
+async function borrarFotosPorTag(env, slug, tipo) {
+  const cloud = env.CLOUDINARY_CLOUD_NAME;
+  const key = env.CLOUDINARY_API_KEY;
+  const secret = env.CLOUDINARY_API_SECRET;
+  // Fallar cerrado: sin credenciales no se puede saber si hay fotos — no se
+  // borra el evento a medias (las fotos quedarían huerfanas sin registro).
+  if (!cloud || !key || !secret) {
+    return { pendiente: true, motivo: 'cloudinary_no_configurado' };
+  }
+  const tag = tagFor(slug, tipo);
+  const url = `https://api.cloudinary.com/v1_1/${cloud}/resources/image/tags/${encodeURIComponent(tag)}`;
+  const auth = btoa(`${key}:${secret}`);
+  const res = await fetch(url, { method: 'DELETE', headers: { Authorization: `Basic ${auth}` } });
+  if (res.status === 404) return { borradas: 0 };
+  if (!res.ok) {
+    return { error: true, status: res.status, body: (await res.text()).slice(0, 300) };
+  }
+  const data = await res.json();
+  return { borradas: Object.keys(data.deleted || {}).length };
+}
+
+async function borrarEvento(request, env, slug) {
+  if (!checkPin(request, env)) return unauthorized(env);
+
+  const ip = clientIp(request);
+  const rl = rateLimit(`borrar:${ip}`, 10, 60_000);
+  if (rl.limited) {
+    return json({ error: 'rate_limited', retry_after: rl.retryAfter }, 429, env,
+      { 'Retry-After': String(rl.retryAfter) });
+  }
+
+  const existe = await env.DB.prepare(`SELECT slug, nombre FROM eventos WHERE slug = ?`).bind(slug).first();
+  if (!existe) return notFound(env);
+
+  // ORDEN: fotos PRIMERO, fila DESPUÉS. Si Cloudinary falla, el evento queda
+  // entero y el borrado se reintenta — nunca un evento borrado con fotos vivas
+  // que ningún álbum puede listar. Los LEADS se conservan a propósito (dato de
+  // negocio; el slug huérfano en leads es registro histórico).
+  const fotos = { suelta: 0, tira: 0 };
+  for (const tipo of TIPOS_FOTO) {
+    const r = await borrarFotosPorTag(env, slug, tipo);
+    if (r.pendiente) {
+      return json({ error: 'fotos_no_disponibles', motivo: r.motivo }, 503, env);
+    }
+    if (r.error) {
+      return json({ error: 'cloudinary', status: r.status }, 502, env);
+    }
+    fotos[tipo] = r.borradas;
+  }
+
+  await env.DB.prepare(`DELETE FROM eventos WHERE slug = ?`).bind(slug).run();
+
+  return json({ ok: true, slug, nombre: existe.nombre, fotos_borradas: fotos }, 200, env);
+}
+
 async function crearLead(request, env) {
   const ip = clientIp(request);
   const rl = rateLimit(`lead:${ip}`, 20, 60_000);
@@ -350,6 +409,7 @@ export default {
         if (!SLUG_RE.test(slug)) return notFound(env);
         if (method === 'GET') return getEvento(env, slug);
         if (method === 'PATCH') return editarEvento(request, env, slug);
+        if (method === 'DELETE') return borrarEvento(request, env, slug);
       }
 
       const mFotos = path.match(/^\/api\/fotos\/([^/]+)\/([^/]+)$/);
