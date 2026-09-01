@@ -70,6 +70,10 @@
     if (!form) return;
     form.addEventListener('submit', function (ev) {
       ev.preventDefault();
+      // El Form Block de Webflow delega su submit en document: sin cortar la
+      // propagacion, webflow.js procesa el form igual y muestra su "Thank you!"
+      // (reporte del agente de /subir, 2026-09-01).
+      ev.stopPropagation();
       var input = el('pin-input');
       var v = input ? (input.value || '').trim() : '';
       if (!v) { setEstado('Escribí el PIN.', true); return; }
@@ -147,6 +151,9 @@
     if (!form) return;
     form.addEventListener('submit', function (ev) {
       ev.preventDefault();
+      // Mismo corte que pin-form: que el submit no llegue al handler delegado
+      // de webflow.js (Form Block).
+      ev.stopPropagation();
       var nombre = (el('nuevo-nombre') || {}).value || '';
       var lugar = (el('nuevo-lugar') || {}).value || '';
       var fecha = (el('nuevo-fecha') || {}).value || '';
