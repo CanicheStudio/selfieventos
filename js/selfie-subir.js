@@ -17,6 +17,12 @@
 (function (window, document) {
   'use strict';
 
+  // Guarda anti doble-carga: durante la migracion de los paneles freeform a
+  // registered scripts la pagina puede referenciar el archivo DOS veces por
+  // una ventana de publish — el segundo init duplicaria handlers y POSTs.
+  if (window.__selfieSubirInit) return;
+  window.__selfieSubirInit = true;
+
   var CFG = window.SELFIE_CONFIG;
 
   // Turnstile de Webflow Forms: el runtime nuevo deshabilita el submit de CADA
