@@ -203,9 +203,16 @@
       toggle.addEventListener('click', function (ev) {
         ev.preventDefault();
         var p = el('nuevo-panel');
-        show(p, !p || p.style.display === 'none');
+        // El panel arranca oculto por CSS de página (regla por atributo), sin
+        // style inline: decidir por computed style, no por style.display (que
+        // vale '' al arranque y hacía que abriera recién al segundo clic).
+        show(p, !p || getComputedStyle(p).display === 'none');
       });
     }
+    // Estado inicial explícito: deja style="display:none" desde el arranque,
+    // así el par de reglas CSS de la página ([data-selfie="nuevo-panel"] /
+    // [style]) parte de un estado conocido.
+    show(el('nuevo-panel'), false);
   }
 
   /* ─────────────── modales de Lumos (piezas de Cani, con guarda) ─────────── */
@@ -296,6 +303,9 @@
   function actualizarDestino() {
     var n = el('destino');
     if (!n) return;
+    // Paso 3 (Section paso-subir, arranca display:none): visible solo con un
+    // evento elegido. Con guarda: sin la Section, no cambia nada.
+    show(el('paso-subir'), !!state.slug);
     var t = nodoTexto(n);   // el texto cae en el nodo interno de la pieza de Cani
     if (!state.slug) { t.textContent = 'Elegí un evento para poder subir.'; return; }
     var ev = state.eventos.filter(function (e) { return e.slug === state.slug; })[0];
@@ -318,9 +328,12 @@
     var abriendo = false;
     function botonEsperando(on) {
       abriendo = on;
-      if ('disabled' in btn) btn.disabled = on;
-      if (on) btn.setAttribute('disabled', '');
-      else btn.removeAttribute('disabled');
+      // El data-selfie del Button Main cae en el div wrapper: el disabled va
+      // sobre el <button>/<a> interno, sobre el div no hace nada.
+      var real = btn.querySelector('button, a') || btn;
+      if ('disabled' in real) real.disabled = on;
+      if (on) real.setAttribute('disabled', '');
+      else real.removeAttribute('disabled');
       if (btnTexto) btnTexto.textContent = on ? 'Abriendo el selector…' : textoOriginal;
     }
 
