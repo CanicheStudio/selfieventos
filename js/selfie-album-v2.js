@@ -177,17 +177,28 @@
     actualizarBarra();
   }
 
-  // A8: la card de foto es un componente de CANI (§2 de la spec): el template
-  // vive OCULTO dentro del grid con data-selfie="card-template". Se captura
-  // UNA vez y se saca del DOM — así render() puede vaciar el grid sin matarlo,
+  // A8/v7: la card de foto es un componente de CANI (§2 de la spec): cada
+  // grilla trae su template adentro (card-suelta / card-tira). Se captura UNA
+  // vez y se saca del DOM — así renderTab() puede vaciar el grid sin matarlo,
   // y el template nunca se muestra ni se cuenta como foto.
-  var tplCard = null;
-  function cardTpl() {
-    if (tplCard) return tplCard;
-    var cont = el('grid');
-    var t = cont && cont.querySelector('[data-selfie="card-template"]');
-    if (t) { t.parentNode.removeChild(t); tplCard = t; }
-    return tplCard;
+  // v7: dos grillas fijas (grid-suelta / grid-tira), cada una con su propio
+  // template (card-suelta / card-tira). La grilla real es el slot .u-grid que
+  // está DENTRO del componente Grid: el div de afuera (.u-grid-wrapper) es el
+  // panel que Lumos usa para el switch de tabs y le pisa el display — nunca
+  // escribir ahí.
+  function gridDe(tab) {
+    var wrap = el(tab === 'tira' ? 'grid-tira' : 'grid-suelta');
+    return wrap ? (wrap.querySelector('.u-grid') || wrap) : null;
+  }
+
+  var tplCache = {};
+  function cardTpl(tab) {
+    if (Object.prototype.hasOwnProperty.call(tplCache, tab)) return tplCache[tab];
+    var cont = gridDe(tab);
+    var t = cont && cont.querySelector('[data-selfie="card-' + tab + '"]');
+    if (t && t.parentNode) t.parentNode.removeChild(t);   // sale del DOM y queda cacheado
+    tplCache[tab] = t || null;
+    return tplCache[tab];
   }
 
   function refrescarCard(card, foto) {
@@ -202,7 +213,7 @@
     if (input) { input.checked = on; input.setAttribute('aria-checked', on ? 'true' : 'false'); }
   }
 
-  function fotoNodoDesdeTemplate(tpl, foto, idx) {
+  function fotoNodoDesdeTemplate(tpl, foto, idx, tab) {
     var card = tpl.cloneNode(true);
     card.removeAttribute('data-selfie');   // el clon es una card, no el template
     card.style.display = '';               // por si el template se oculta inline
@@ -215,7 +226,7 @@
       img.loading = 'lazy';
       img.alt = state.evento ? ('Foto de ' + state.evento.nombre) : 'Foto del evento';
       img.src = CFG.fotoUrl(foto.public_id, 'c_fill,w_400,q_auto,f_auto');
-      img.addEventListener('click', function () { abrirLightbox(idx); });
+      img.addEventListener('click', function () { abrirLightbox(idx, tab); });
     }
 
     var check = card.querySelector('[data-selfie="card-check"]');
@@ -250,7 +261,7 @@
   // TODO(§2): cuando la card template exista en el Designer y esté VERIFICADA,
   // este fabricador de UI por createElement (y sus estilos) se elimina.
   // Hasta entonces es el fallback que mantiene el álbum vivo.
-  function fotoNodo(foto, idx) {
+  function fotoNodo(foto, idx, tab) {
     var wrap = document.createElement('div');
     wrap.className = 'selfie_foto_item';
     wrap.setAttribute('data-idx', String(idx));
@@ -272,42 +283,43 @@
       actualizarBarra();
     });
 
-    img.addEventListener('click', function () { abrirLightbox(idx); });
+    img.addEventListener('click', function () { abrirLightbox(idx, tab); });
 
     wrap.appendChild(img);
     wrap.appendChild(check);
     return wrap;
   }
 
-  function render() {
-    var hooked = el('grid');
-    if (!hooked) return;
-    // Las columnas de Lumos viven en la .u-grid INTERNA del wrapper: se inyecta
-    // adentro de ella. Vaciar el wrapper la mataba y las cards quedaban
-    // apiladas a lo ancho (medido en prod: card de 1133px en grid de 1133px).
-    var cont = hooked.querySelector('.u-grid') || hooked;
-    var tpl = cardTpl();   // capturar ANTES de vaciar el grid (el template vive adentro)
+  // v7: como Lumos ya muestra/oculta el panel activo, se renderizan LAS DOS
+  // grillas de una y el cambio de tab no re-renderiza nada.
+  function renderTab(tab) {
+    var cont = gridDe(tab);
+    if (!cont) return 0;
+    var tpl = cardTpl(tab);   // capturar ANTES de vaciar (el template vive adentro)
     cont.innerHTML = '';
-    var fotos = state.fotos[state.tab] || [];
-
-    if (!fotos.length) {
-      setEstado(state.tab === 'tira'
-        ? 'Todavía no hay tiras de este evento.'
-        : 'Todavía no hay fotos de este evento.');
-      return;
-    }
-    setEstado('');
+    var fotos = state.fotos[tab] || [];
     fotos.forEach(function (f, i) {
-      cont.appendChild(tpl ? fotoNodoDesdeTemplate(tpl, f, i) : fotoNodo(f, i));
+      cont.appendChild(tpl ? fotoNodoDesdeTemplate(tpl, f, i, tab) : fotoNodo(f, i, tab));
     });
+    return fotos.length;
+  }
+
+  function render() {
+    var nSuelta = renderTab('suelta');
+    var nTira = renderTab('tira');
+    // La visibilidad de las tabs NO se toca acá: es de cargarFotos (regla A7 —
+    // con un solo tipo con fotos se ocultan las dos, no una).
+    setEstado((nSuelta + nTira) ? '' : 'Todavía no hay fotos de este evento.');
     actualizarBarra();
   }
 
   function initTabs() {
+    // Lumos maneja el switch de paneles; acá solo se registra la tab activa,
+    // que la usan "Seleccionar todas" y el ZIP.
     var tSuelta = el('tab-suelta');
     var tTira = el('tab-tira');
-    if (tSuelta) tSuelta.addEventListener('click', function () { state.tab = 'suelta'; render(); marcarTab(); });
-    if (tTira) tTira.addEventListener('click', function () { state.tab = 'tira'; render(); marcarTab(); });
+    if (tSuelta) tSuelta.addEventListener('click', function () { state.tab = 'suelta'; marcarTab(); });
+    if (tTira) tTira.addEventListener('click', function () { state.tab = 'tira'; marcarTab(); });
   }
 
   function marcarTab() {
@@ -473,7 +485,7 @@
       });
   }
 
-  function abrirLightbox(idx) {
+  function abrirLightbox(idx, tab) {
     var lb = el('lightbox'), img = el('lightbox-img');
     if (!lb || !img) return;
     // El Visual Image de Lumos bindea el atributo en el div wrapper, no en el
@@ -490,7 +502,7 @@
     var modalId = lb.getAttribute('data-modal-target');
     var lumosModal = window.lumos && window.lumos.modal && window.lumos.modal.list &&
       modalId && window.lumos.modal.list[modalId];
-    var fotos = state.fotos[state.tab] || [];
+    var fotos = state.fotos[tab || state.tab] || [];
     var i = idx;
 
     // A11: el botón "Seleccionar" del visor refleja el estado de la foto EN
@@ -576,7 +588,14 @@
         show(el('tab-tira'), ambas);
         // Sin tabs a la vista, la activa DEBE ser la que tiene fotos (si no,
         // un evento solo-tiras quedaría clavado en "no hay fotos" sin salida).
-        if (!ambas && hayTiras) state.tab = 'tira';
+        // v7: los paneles los muestra/oculta Lumos y arranca en el primero
+        // (sueltas) — el click programático dispara su switch aunque el link
+        // esté oculto por display:none.
+        if (!ambas && hayTiras) {
+          state.tab = 'tira';
+          var tTira = el('tab-tira');
+          if (tTira) tTira.click();
+        }
         render();
         marcarTab();
       })
