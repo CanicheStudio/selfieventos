@@ -27,7 +27,7 @@
   // SOLO en forms hookeados nuestros, ANTES de que webflow.js inicialice
   // (este script carga primero en el body). El boton se re-habilita por si
   // este script llego a correr despues.
-  (function () {
+  function optOutTurnstile() {
     var forms = document.querySelectorAll('form[data-selfie], [data-selfie] form');
     Array.prototype.forEach.call(forms, function (f) {
       f.setAttribute('data-wf-no-turnstile', '');
@@ -36,7 +36,12 @@
       var b = f.querySelector('button[type="submit"], input[type="submit"]');
       if (b) { b.disabled = false; b.classList.remove('w-form-loading'); }
     });
-  })();
+  }
+  // Corre YA (si el script va al final del body, gana antes del init de
+  // webflow.js) y de nuevo en DOMContentLoaded (si alguien mueve el script al
+  // head, el sweep inmediato no encuentra forms — el segundo pase re-habilita).
+  optOutTurnstile();
+  document.addEventListener('DOMContentLoaded', optOutTurnstile);
 
   if (!CFG) { console.error('[selfie-subir] falta selfie-config.js'); return; }
 
