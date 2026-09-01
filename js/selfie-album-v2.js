@@ -228,6 +228,21 @@
       });
     }
 
+    // El hook card-check es un prop del componente de Cani y puede caer en
+    // cualquier nodo de la card (el texto, el wrapper, el input mismo). Si el
+    // click aterriza DIRECTO en el checkbox nativo por fuera del hook, el
+    // preventDefault de arriba no corre y el tilde cambiaría sin actualizar la
+    // selección — este listener sincroniza ese camino. No duplica: cuando el
+    // click pasa por el hook, el preventDefault cancela el tilde nativo y
+    // 'change' nunca dispara.
+    var inputNativo = card.querySelector('input[type="checkbox"]');
+    if (inputNativo) {
+      inputNativo.addEventListener('change', function () {
+        toggleSeleccion(foto);
+        refrescarCard(card, foto);
+      });
+    }
+
     refrescarCard(card, foto);
     return card;
   }
