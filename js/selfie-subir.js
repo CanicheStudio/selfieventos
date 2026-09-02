@@ -427,7 +427,7 @@
         if (!r.ok) { setEstado('No se pudo borrar el evento.', true); return; }
         return r.json().then(function (d) {
           var n = (d.fotos_borradas ? (d.fotos_borradas.suelta + d.fotos_borradas.tira) : 0);
-          setEstado('Evento borrado: ' + (d.nombre || d.slug) + (n ? ' (' + n + ' foto' + (n === 1 ? '' : 's') + ' borradas)' : ''));
+          setEstado('Evento borrado: ' + (d.nombre || d.slug) + (n ? ' (' + n + ' foto' + (n === 1 ? ' borrada' : 's borradas') + ')' : ''));
           state.slug = null;
           return cargarEventos().then(function () { actualizarDestino(); });
         });
@@ -441,91 +441,114 @@
 
   var abriendoSelector = false;
 
-  // Abre el widget de Cloudinary para el tipo ACTUAL, con el estado de espera
-  // pintado en el botón que se tocó (A1: en el celular de Fer el iframe tarda
-  // segundos y sin feedback parece muerto).
+  /* Subida DIRECTA a Cloudinary (preset unsigned) con input nativo.
+   * El widget oficial murió acá 2026-09-02: vive en un iframe que depende de
+   * storage de terceros — con third-party cookies bloqueadas (incógnito, y el
+   * default al que Chrome migra) el iframe cuelga o se degrada a una ventana
+   * popup (medido en el Chrome de Cani, perfil normal E incógnito). El diálogo
+   * NATIVO de archivos no depende de nada de eso, y en el celular ofrece
+   * cámara/galería solo. Menos piezas.
+   * CORS verificado: OPTIONS a api.cloudinary.com con Origin del site → 200
+   * con Allow-Origin correcto y POST permitido (medido 2026-09-02). */
+
+  var LIMITE_TANDA = 300;             // paridad con el tope del widget viejo
+  var LIMITE_BYTES = 10 * 1024 * 1024; // paridad con el preset (10 MB)
+
+  function subirArchivo(file, tag) {
+    var datos = new FormData();
+    datos.append('file', file);
+    datos.append('upload_preset', CFG.UPLOAD_PRESET);
+    datos.append('folder', CFG.CLOUDINARY_FOLDER);
+    datos.append('tags', tag);
+    return fetch('https://api.cloudinary.com/v1_1/' + CFG.CLOUD_NAME + '/image/upload', {
+      method: 'POST',
+      body: datos
+    }).then(function (r) {
+      if (!r.ok) return r.text().then(function (t) {
+        console.warn('[selfie-subir] upload ' + r.status, t.slice(0, 200));
+        return false;
+      });
+      return true;
+    }).catch(function (e) {
+      console.warn('[selfie-subir] upload error', e);
+      return false;
+    });
+  }
+
   function abrirSelector(btn) {
     if (abriendoSelector) return;
 
     // Bloqueo explícito: sin evento no se sube (si no, las fotos caen en un
     // tag que ningún álbum pide y se pierden sin que nadie se entere).
     if (!state.slug) { setEstado('Primero elegí el evento.', true); return; }
-    if (typeof window.cloudinary === 'undefined') {
-      setEstado('No se pudo abrir el subidor.', true);
-      console.error('[selfie-subir] falta el widget de Cloudinary');
-      return;
-    }
 
+    var tag = CFG.tagFor(state.slug, state.tipo);
     var btnTexto = nodoTexto(btn);
     var textoOriginal = btnTexto ? btnTexto.textContent : '';
-    function esperando(on) {
+    function pintarBoton(msg) { if (btnTexto) btnTexto.textContent = msg || textoOriginal; }
+    function ocupado(on) {
       abriendoSelector = on;
       if (!btn) return;
-      // El data-selfie del Button Main cae en el div wrapper: el disabled va
-      // sobre el <button>/<a> interno, sobre el div no hace nada.
       var real = btn.querySelector('button, a') || btn;
       if ('disabled' in real) real.disabled = on;
       if (on) real.setAttribute('disabled', '');
       else real.removeAttribute('disabled');
-      if (btnTexto) btnTexto.textContent = on ? 'Abriendo el selector…' : textoOriginal;
     }
 
-    esperando(true);
-    // A3: conteo por tanda desde los callbacks (el widget se crea por click,
-    // así que los contadores arrancan en cero solos).
-    var subidas = 0, fallidas = 0;
+    // Input nativo, uno por click (el click del usuario ES el gesto que el
+    // browser exige para abrir el diálogo — tiene que ser sincrónico).
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true;
+    input.style.display = 'none';
+    document.body.appendChild(input);
 
-    var tag = CFG.tagFor(state.slug, state.tipo);   // contrato compartido con el Worker
-    var widget = window.cloudinary.createUploadWidget({
-      cloudName: CFG.CLOUD_NAME,
-      uploadPreset: CFG.UPLOAD_PRESET,
-      folder: CFG.CLOUDINARY_FOLDER,
-      tags: [tag],
-      sources: ['local', 'camera'],
-      multiple: true,
-      maxFiles: 300,
-      // A5: solo imágenes — un .zip o video se rechaza en el picker, no
-      // después de subirlo ('image' es shortcut documentado del widget).
-      clientAllowedFormats: ['image'],
-      language: 'es',
-      text: { es: {
-        or: 'o',
-        menu: { files: 'Mis fotos', camera: 'Cámara' },
-        // A5: errores del widget en español. Claves verificadas contra el
-        // text.json oficial (uploader.errors.*) — no inventar claves acá.
-        uploader: { errors: {
-          allowed_formats: 'Ese archivo no es una imagen. Subí fotos JPG o PNG.',
-          max_number_of_files: 'Son demasiados archivos: hasta 300 por tanda.',
-          max_file_size: 'El archivo es demasiado pesado.',
-          min_file_size: 'El archivo es demasiado chico.',
-          file_too_large: 'El archivo ({{size}}) supera el máximo permitido ({{allowed}}).'
-        } }
-      } }
-    }, function (error, result) {
-      if (error) {
-        fallidas += 1;
-        esperando(false);
-        console.error('[selfie-subir]', error);
-        setEstado('Hubo un problema al subir. Probá de nuevo.', true);
+    input.addEventListener('change', function () {
+      var todos = Array.prototype.slice.call(input.files || []);
+      document.body.removeChild(input);
+      if (!todos.length) return;
+
+      if (todos.length > LIMITE_TANDA) {
+        setEstado('Son demasiados archivos: hasta ' + LIMITE_TANDA + ' por tanda.', true);
         return;
       }
-      if (result && result.event === 'display-changed') {
-        // El widget ya se mostró (o cambió de estado): el botón vuelve solo.
-        esperando(false);
+      var fallidas = 0;
+      var lote = todos.filter(function (f) {
+        // A5: solo imágenes y tope de peso — se rechaza ANTES de subir.
+        if (f.type.indexOf('image/') !== 0 || f.size > LIMITE_BYTES) { fallidas += 1; return false; }
+        return true;
+      });
+
+      ocupado(true);
+      var subidas = 0, hechas = 0, total = lote.length;
+      function progreso() {
+        pintarBoton('Subiendo ' + hechas + '/' + total + '…');
       }
-      if (result && result.event === 'success') {
-        subidas += 1;
-        setEstado('Subida: ' + (result.info && result.info.original_filename ? result.info.original_filename : 'foto'));
+      progreso();
+      setEstado('Subiendo ' + total + (total === 1 ? ' foto' : ' fotos') + ' a ' + nombreEvento() + '…');
+
+      // De a 3 en paralelo: rápido sin ahogar la señal del celular de Fer.
+      var i = 0;
+      function siguiente() {
+        if (i >= lote.length) return Promise.resolve();
+        var f = lote[i]; i += 1;
+        return subirArchivo(f, tag).then(function (ok) {
+          if (ok) subidas += 1; else fallidas += 1;
+          hechas += 1;
+          progreso();
+          return siguiente();
+        });
       }
-      if (result && result.event === 'queues-end') {
-        // A2: la tanda terminó, el widget sobra. quiet: sin confirmación
-        // (la cola ya está vacía, no se aborta nada).
-        widget.close({ quiet: true });
-        // Con 0 y 0 no hay nada que anunciar (queues-end sin archivos).
-        if (subidas + fallidas > 0) mostrarResultado(subidas, fallidas);
-      }
+      Promise.all([siguiente(), siguiente(), siguiente()]).then(function () {
+        ocupado(false);
+        pintarBoton();
+        setEstado('');
+        mostrarResultado(subidas, fallidas);
+      });
     });
-    widget.open();
+
+    input.click();
   }
 
   function initUpload() {
