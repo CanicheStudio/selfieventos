@@ -579,24 +579,13 @@
   }
 
   function initUpload() {
+    // A3: "Subir más" cierra el modal de éxito (pieza de Cani, con guarda).
     vigilarCierre(el('exito'));
-
-    // "Subir más" promete acción (Cani 2026-09-02): cierra el modal de éxito
-    // Y abre el selector con el tipo vigente, en el mismo gesto. El click del
-    // usuario es lo que habilita input.click(): tiene que ser sincrónico, así
-    // que el <dialog> se cierra nativo YA (la animación de Lumos corre igual,
-    // de fondo, y deja su timeline lista para la próxima apertura).
     var subirMas = el('exito-subir-mas');
     if (subirMas) {
       subirMas.addEventListener('click', function (ev) {
         ev.preventDefault();
-        var modal = el('exito');
-        cerrarModal(modal);
-        if (modal && modal.tagName === 'DIALOG' && modal.open) {
-          modal.close();
-          document.body.style.overflow = '';
-        }
-        abrirSelector(el('tipo-' + state.tipo) || el('subir-btn'));
+        cerrarModal(el('exito'));
       });
     }
 
