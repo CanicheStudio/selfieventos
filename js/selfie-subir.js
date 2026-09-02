@@ -299,8 +299,17 @@
   function cerrarModal(node) {
     if (!node) return;
     var api = lumosModalApi(node);
-    if (api) api.close();
-    else if (node.tagName === 'DIALOG') { if (node.open) node.close(); }
+    if (api) {
+      api.close();
+      // Medido 2026-09-02 (modal-exito de /subir): el close() de la API de
+      // Lumos puede no cerrar el <dialog> (el nativo sí). Se le da el tiempo
+      // de su animación y, si sigue abierto, se fuerza el cierre nativo.
+      if (node.tagName === 'DIALOG') {
+        setTimeout(function () { if (node.open) node.close(); }, 700);
+      }
+      return;
+    }
+    if (node.tagName === 'DIALOG') { if (node.open) node.close(); }
     else show(node, false);
   }
 
