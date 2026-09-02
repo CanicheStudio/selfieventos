@@ -307,6 +307,64 @@ async function borrarEvento(request, env, slug) {
   return json({ ok: true, slug, nombre: existe.nombre, fotos_borradas: fotos }, 200, env);
 }
 
+/**
+ * Borra fotos SUELTAS (algunas, no todas) de un evento. Operador con PIN, desde
+ * el álbum en modo operador. Contrato: POST {evento, public_ids[]} → solo se
+ * borran los public_ids que PERTENECEN al evento (intersección con el listado
+ * real por tag, ambos tipos): un id ajeno o inventado se devuelve en
+ * `rechazadas` y no toca Cloudinary. Tope 100 por llamada (límite de la Admin
+ * API). Fail-closed igual que borrarEvento: sin credenciales → 503.
+ */
+async function borrarFotos(request, env) {
+  if (!checkPin(request, env)) return unauthorized(env);
+
+  const ip = clientIp(request);
+  const rl = rateLimit(`borrarfotos:${ip}`, 30, 60_000);
+  if (rl.limited) {
+    return json({ error: 'rate_limited', retry_after: rl.retryAfter }, 429, env,
+      { 'Retry-After': String(rl.retryAfter) });
+  }
+
+  const body = await readJson(request);
+  if (!body) return json({ error: 'json_invalido' }, 400, env);
+  const slug = String(body.evento || '').trim();
+  const ids = Array.isArray(body.public_ids)
+    ? body.public_ids.filter((x) => typeof x === 'string' && x.length > 0 && x.length < 200).slice(0, 100)
+    : [];
+  const fields = [];
+  if (!slug) fields.push('evento');
+  if (!ids.length) fields.push('public_ids');
+  if (fields.length) return json({ error: 'campos_invalidos', fields }, 400, env);
+
+  const existe = await env.DB.prepare(`SELECT slug FROM eventos WHERE slug = ?`).bind(slug).first();
+  if (!existe) return notFound(env, 'evento_not_found');
+
+  // Pertenencia: el listado real del evento (mismo contrato tagFor que el álbum).
+  const propias = new Set();
+  for (const tipo of TIPOS_FOTO) {
+    const r = await listarFotosPorTag(env, slug, tipo);
+    if (r.pendiente) return json({ error: 'fotos_no_disponibles', motivo: r.motivo }, 503, env);
+    if (r.error) return json({ error: 'cloudinary', status: r.status }, 502, env);
+    r.fotos.forEach((f) => propias.add(f.public_id));
+  }
+  const aBorrar = ids.filter((id) => propias.has(id));
+  const rechazadas = ids.filter((id) => !propias.has(id));
+  if (!aBorrar.length) return json({ ok: true, evento: slug, borradas: 0, ids: [], rechazadas }, 200, env);
+
+  const cloud = env.CLOUDINARY_CLOUD_NAME;
+  const auth = btoa(`${env.CLOUDINARY_API_KEY}:${env.CLOUDINARY_API_SECRET}`);
+  const url = `https://api.cloudinary.com/v1_1/${cloud}/resources/image/upload?` +
+    aBorrar.map((id) => 'public_ids[]=' + encodeURIComponent(id)).join('&');
+  const res = await fetch(url, { method: 'DELETE', headers: { Authorization: `Basic ${auth}` } });
+  if (!res.ok) {
+    return json({ error: 'cloudinary', status: res.status, detalle: (await res.text()).slice(0, 300) }, 502, env);
+  }
+  const data = await res.json();
+  // Cloudinary responde {deleted: {id: 'deleted' | 'not_found'}}: se cuenta solo lo borrado de verdad.
+  const borradas = Object.entries(data.deleted || {}).filter(([, v]) => v === 'deleted').map(([k]) => k);
+  return json({ ok: true, evento: slug, borradas: borradas.length, ids: borradas, rechazadas }, 200, env);
+}
+
 async function crearLead(request, env) {
   const ip = clientIp(request);
   const rl = rateLimit(`lead:${ip}`, 20, 60_000);
@@ -411,6 +469,8 @@ export default {
         if (method === 'PATCH') return editarEvento(request, env, slug);
         if (method === 'DELETE') return borrarEvento(request, env, slug);
       }
+
+      if (path === '/api/fotos/borrar' && method === 'POST') return borrarFotos(request, env);
 
       const mFotos = path.match(/^\/api\/fotos\/([^/]+)\/([^/]+)$/);
       if (mFotos && method === 'GET') {

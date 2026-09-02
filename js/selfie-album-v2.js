@@ -58,6 +58,12 @@
   if (!CFG) { console.error('[selfie-album] falta selfie-config.js'); return; }
 
   var LS_EMAIL = 'selfie_email';
+  // Modo operador: Fer llega al álbum desde /subir con el mismo navegador, así
+  // que su PIN ya está en localStorage. Con PIN se habilita "Borrar
+  // seleccionadas" (pieza de Cani, hook borrar-seleccionadas). Los invitados
+  // no tienen PIN → nunca ven el botón, y el Worker rechaza sin PIN igual.
+  var LS_PIN = 'selfie_pin';
+  function pinOperador() { try { return window.localStorage.getItem(LS_PIN) || ''; } catch (e) { return ''; } }
   var state = { slug: null, evento: null, fotos: { suelta: [], tira: [] }, tab: 'suelta', sel: {} };
 
   var $ = function (sel, ctx) { return (ctx || document).querySelector(sel); };
@@ -413,6 +419,8 @@
     var cont = el('contador');
     if (cont) nodoTexto(cont).textContent = n ? (n + ' seleccionada' + (n > 1 ? 's' : '')) : '';
     show(el('barra'), n > 0);
+    show(el('borrar-seleccionadas'), n > 0 && !!pinOperador());
+    if (typeof desarmarBorrar === 'function') desarmarBorrar();
     actualizarSeleccionarTodo();
   }
 
@@ -449,6 +457,75 @@
     }
     var zip = el('descargar-zip');
     if (zip) zip.addEventListener('click', function (ev) { ev.preventDefault(); descargarZip(); });
+    initBorrarFotos();
+  }
+
+  /* ─────────────── borrar seleccionadas (modo operador, con PIN) ─────────── */
+
+  var desarmarBorrar = null;
+
+  function initBorrarFotos() {
+    var btn = el('borrar-seleccionadas');
+    if (!btn) return;
+    var t = nodoTexto(btn);
+    var textoOriginal = t ? t.textContent : '';
+    var armado = false, timer = null, borrando = false;
+
+    desarmarBorrar = function () {
+      armado = false;
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (t) t.textContent = textoOriginal;
+    };
+
+    btn.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      if (borrando) return;
+      var ids = Object.keys(state.sel);
+      if (!ids.length) return;
+      var pin = pinOperador();
+      if (!pin) { show(btn, false); return; }
+
+      // Confirmación de dos toques (Cani 2026-09-02: "no las tienen que borrar
+      // de una"). El primero arma por 6 s, el segundo ejecuta.
+      if (!armado) {
+        armado = true;
+        if (t) t.textContent = '¿Seguro? Borra ' + ids.length + (ids.length === 1 ? ' foto' : ' fotos');
+        setEstado('Vas a borrar ' + ids.length + (ids.length === 1 ? ' foto' : ' fotos') + ' del evento. Tocá de nuevo para confirmar.');
+        timer = setTimeout(function () { desarmarBorrar(); setEstado(''); }, 6000);
+        return;
+      }
+
+      desarmarBorrar();
+      borrando = true;
+      setEstado('Borrando…');
+      fetch(CFG.api('/api/fotos/borrar'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Selfie-Pin': pin },
+        body: JSON.stringify({ evento: state.slug, public_ids: ids })
+      }).then(function (r) {
+        borrando = false;
+        if (r.status === 401) { setEstado('El PIN dejó de ser válido. Volvé a entrar desde Subir.'); show(btn, false); return; }
+        if (r.status === 429) { setEstado('Demasiados intentos. Esperá un minuto.'); return; }
+        if (!r.ok) { setEstado('No se pudieron borrar las fotos. Probá de nuevo.'); return; }
+        return r.json().then(function (d) {
+          var borradas = {};
+          (d.ids || []).forEach(function (id) { borradas[id] = true; });
+          // Se sacan del estado local (la lista del Worker queda cacheada 60 s:
+          // volver a pedirla mostraría fotos que ya no existen).
+          ['suelta', 'tira'].forEach(function (tipo) {
+            state.fotos[tipo] = (state.fotos[tipo] || []).filter(function (f) { return !borradas[f.public_id]; });
+          });
+          state.sel = {};
+          render();
+          var n = d.borradas || 0;
+          setEstado(n ? (n + (n === 1 ? ' foto borrada.' : ' fotos borradas.')) : 'No se borró ninguna foto.');
+        });
+      }).catch(function (err) {
+        borrando = false;
+        console.error('[selfie-album]', err);
+        setEstado('No se pudo conectar. Revisá la señal.');
+      });
+    });
   }
 
   // Modales de Lumos (piezas de Cani, con guarda) — mismo patrón que el
