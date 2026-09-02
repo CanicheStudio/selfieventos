@@ -70,18 +70,17 @@
   }
 
   function setEstado(msg, esError) {
-    var n = el('estado');
-    if (n) {
-      // El nodo puede quedar dentro de la seccion OCULTA (gate vs app): un
-      // "PIN incorrecto" escrito en un contenedor display:none es invisible
-      // (bug real: Cani no veia ningun error al fallar el PIN, 2026-08-29).
-      // Se muda al contenedor visible antes de escribir.
-      var gate = el('pin-gate');
-      var app = el('app');
-      var visible = (gate && gate.style.display !== 'none') ? gate : app;
-      if (visible && n.parentElement !== visible) visible.appendChild(n);
-      nodoTexto(n).textContent = msg; show(n, !!msg); n.setAttribute('data-error', esError ? '1' : '0');
-    }
+    // El nodo de estado NO se mueve de donde Cani lo puso (2026-09-02: el
+    // reparenteo anterior lo sacaba de su Card y lo dejaba colgando al final
+    // de la Section — "me lo tira afuera de la caja"). Puede haber uno por
+    // seccion (gate y app), todos con el hook "estado": se escribe en todos y
+    // el que este en la seccion visible es el que se ve.
+    var nodos = document.querySelectorAll('[data-selfie="estado"]');
+    Array.prototype.forEach.call(nodos, function (n) {
+      nodoTexto(n).textContent = msg;
+      show(n, !!msg);
+      n.setAttribute('data-error', esError ? '1' : '0');
+    });
     if (msg) (esError ? console.warn : console.info)('[selfie-subir]', msg);
   }
 
@@ -296,21 +295,38 @@
     else show(node, true);
   }
 
+  // El close() de Lumos es asincronico: revierte su timeline de GSAP y recien
+  // en onReverseComplete llama al close() nativo del <dialog>. Si esa vuelta
+  // no llega (timeline sin crear, tick de GSAP frenado, error en el medio) el
+  // dialog queda open=true: invisible pero MODAL, y toda la pagina de atras
+  // queda inerte — "no me deja subir mas" (medido en el Chrome de Cani,
+  // 2026-09-02). Pasada su animacion, si sigue abierto se cierra nativo y se
+  // restaura lo que resetModal() de Lumos hubiera restaurado.
+  function asegurarCierre(node) {
+    if (!node || node.tagName !== 'DIALOG') return;
+    setTimeout(function () {
+      if (!node.open) return;
+      node.close();
+      document.body.style.overflow = '';
+    }, 700);
+  }
+
   function cerrarModal(node) {
     if (!node) return;
     var api = lumosModalApi(node);
-    if (api) {
-      api.close();
-      // Medido 2026-09-02 (modal-exito de /subir): el close() de la API de
-      // Lumos puede no cerrar el <dialog> (el nativo sí). Se le da el tiempo
-      // de su animación y, si sigue abierto, se fuerza el cierre nativo.
-      if (node.tagName === 'DIALOG') {
-        setTimeout(function () { if (node.open) node.close(); }, 700);
-      }
-      return;
-    }
+    if (api) { api.close(); asegurarCierre(node); return; }
     if (node.tagName === 'DIALOG') { if (node.open) node.close(); }
     else show(node, false);
+  }
+
+  // Mismo respaldo para los cierres que maneja Lumos solo (X, backdrop, Esc):
+  // no pasan por cerrarModal(), asi que se escuchan en el dialog.
+  function vigilarCierre(node) {
+    if (!node || node.tagName !== 'DIALOG') return;
+    node.addEventListener('click', function (e) {
+      if (e.target.closest('[data-modal-close]')) asegurarCierre(node);
+    });
+    node.addEventListener('cancel', function () { asegurarCierre(node); });
   }
 
   function nombreEvento() {
@@ -513,9 +529,11 @@
     input.style.display = 'none';
     document.body.appendChild(input);
 
+    // Si Fer cancela el dialogo, el input no debe quedar tirado en el body.
+    input.addEventListener('cancel', function () { if (input.parentNode) input.parentNode.removeChild(input); });
     input.addEventListener('change', function () {
       var todos = Array.prototype.slice.call(input.files || []);
-      document.body.removeChild(input);
+      if (input.parentNode) input.parentNode.removeChild(input);
       if (!todos.length) return;
 
       if (todos.length > LIMITE_TANDA) {
@@ -562,6 +580,7 @@
 
   function initUpload() {
     // A3: "Subir más" cierra el modal de éxito (pieza de Cani, con guarda).
+    vigilarCierre(el('exito'));
     var subirMas = el('exito-subir-mas');
     if (subirMas) {
       subirMas.addEventListener('click', function (ev) {
