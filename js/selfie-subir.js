@@ -351,6 +351,9 @@
   /* ─────────────────────── tipo (Fotos / Tiras) + upload ─────────────────── */
 
   function initTipo() {
+    // UX Cani 2026-09-02: un botón promete acción inmediata — "Subir fotos" /
+    // "Subir tiras" NO son toggles: setean el tipo y abren el selector en el
+    // mismo gesto (antes había que tocar un tercer botón y nadie lo entendía).
     var bs = el('tipo-suelta'), bt = el('tipo-tira');
     function set(t) {
       state.tipo = t;
@@ -358,8 +361,8 @@
       if (bt) bt.setAttribute('aria-pressed', t === 'tira' ? 'true' : 'false');
       actualizarDestino();
     }
-    if (bs) bs.addEventListener('click', function (e) { e.preventDefault(); set('suelta'); });
-    if (bt) bt.addEventListener('click', function (e) { e.preventDefault(); set('tira'); });
+    if (bs) bs.addEventListener('click', function (e) { e.preventDefault(); set('suelta'); abrirSelector(bs); });
+    if (bt) bt.addEventListener('click', function (e) { e.preventDefault(); set('tira'); abrirSelector(bt); });
     set('suelta');
   }
 
@@ -436,21 +439,28 @@
     });
   }
 
-  function initUpload() {
-    var btn = el('subir-btn');
-    if (!btn) return;
+  var abriendoSelector = false;
 
-    // A1: mientras el widget carga su iframe no pasa nada visible (segundos en
-    // el celular de Fer) → estado observable en el botón, sin timers: se
-    // restaura con el primer display-changed del widget (o ante un error).
-    // El texto va al nodo interno del botón si lo hay; en un component con
-    // estructura sin nodo de texto reconocible, solo disabled (no se pisa).
-    var btnTexto = btn.querySelector('p,[class*="u-text"]');
-    if (!btnTexto && btn.children.length === 0) btnTexto = btn;
+  // Abre el widget de Cloudinary para el tipo ACTUAL, con el estado de espera
+  // pintado en el botón que se tocó (A1: en el celular de Fer el iframe tarda
+  // segundos y sin feedback parece muerto).
+  function abrirSelector(btn) {
+    if (abriendoSelector) return;
+
+    // Bloqueo explícito: sin evento no se sube (si no, las fotos caen en un
+    // tag que ningún álbum pide y se pierden sin que nadie se entere).
+    if (!state.slug) { setEstado('Primero elegí el evento.', true); return; }
+    if (typeof window.cloudinary === 'undefined') {
+      setEstado('No se pudo abrir el subidor.', true);
+      console.error('[selfie-subir] falta el widget de Cloudinary');
+      return;
+    }
+
+    var btnTexto = nodoTexto(btn);
     var textoOriginal = btnTexto ? btnTexto.textContent : '';
-    var abriendo = false;
-    function botonEsperando(on) {
-      abriendo = on;
+    function esperando(on) {
+      abriendoSelector = on;
+      if (!btn) return;
       // El data-selfie del Button Main cae en el div wrapper: el disabled va
       // sobre el <button>/<a> interno, sobre el div no hace nada.
       var real = btn.querySelector('button, a') || btn;
@@ -460,6 +470,65 @@
       if (btnTexto) btnTexto.textContent = on ? 'Abriendo el selector…' : textoOriginal;
     }
 
+    esperando(true);
+    // A3: conteo por tanda desde los callbacks (el widget se crea por click,
+    // así que los contadores arrancan en cero solos).
+    var subidas = 0, fallidas = 0;
+
+    var tag = CFG.tagFor(state.slug, state.tipo);   // contrato compartido con el Worker
+    var widget = window.cloudinary.createUploadWidget({
+      cloudName: CFG.CLOUD_NAME,
+      uploadPreset: CFG.UPLOAD_PRESET,
+      folder: CFG.CLOUDINARY_FOLDER,
+      tags: [tag],
+      sources: ['local', 'camera'],
+      multiple: true,
+      maxFiles: 300,
+      // A5: solo imágenes — un .zip o video se rechaza en el picker, no
+      // después de subirlo ('image' es shortcut documentado del widget).
+      clientAllowedFormats: ['image'],
+      language: 'es',
+      text: { es: {
+        or: 'o',
+        menu: { files: 'Mis fotos', camera: 'Cámara' },
+        // A5: errores del widget en español. Claves verificadas contra el
+        // text.json oficial (uploader.errors.*) — no inventar claves acá.
+        uploader: { errors: {
+          allowed_formats: 'Ese archivo no es una imagen. Subí fotos JPG o PNG.',
+          max_number_of_files: 'Son demasiados archivos: hasta 300 por tanda.',
+          max_file_size: 'El archivo es demasiado pesado.',
+          min_file_size: 'El archivo es demasiado chico.',
+          file_too_large: 'El archivo ({{size}}) supera el máximo permitido ({{allowed}}).'
+        } }
+      } }
+    }, function (error, result) {
+      if (error) {
+        fallidas += 1;
+        esperando(false);
+        console.error('[selfie-subir]', error);
+        setEstado('Hubo un problema al subir. Probá de nuevo.', true);
+        return;
+      }
+      if (result && result.event === 'display-changed') {
+        // El widget ya se mostró (o cambió de estado): el botón vuelve solo.
+        esperando(false);
+      }
+      if (result && result.event === 'success') {
+        subidas += 1;
+        setEstado('Subida: ' + (result.info && result.info.original_filename ? result.info.original_filename : 'foto'));
+      }
+      if (result && result.event === 'queues-end') {
+        // A2: la tanda terminó, el widget sobra. quiet: sin confirmación
+        // (la cola ya está vacía, no se aborta nada).
+        widget.close({ quiet: true });
+        // Con 0 y 0 no hay nada que anunciar (queues-end sin archivos).
+        if (subidas + fallidas > 0) mostrarResultado(subidas, fallidas);
+      }
+    });
+    widget.open();
+  }
+
+  function initUpload() {
     // A3: "Subir más" cierra el modal de éxito (pieza de Cani, con guarda).
     var subirMas = el('exito-subir-mas');
     if (subirMas) {
@@ -469,77 +538,15 @@
       });
     }
 
-    btn.addEventListener('click', function (ev) {
-      ev.preventDefault();
-      // El atributo disabled no frena clicks si el botón es un <a> → guarda propia.
-      if (abriendo) return;
-
-      // Bloqueo explícito: sin evento no se sube (si no, las fotos caen en un
-      // tag que ningún álbum pide y se pierden sin que nadie se entere).
-      if (!state.slug) { setEstado('Primero elegí el evento.', true); return; }
-      if (typeof window.cloudinary === 'undefined') {
-        setEstado('No se pudo abrir el subidor.', true);
-        console.error('[selfie-subir] falta el widget de Cloudinary');
-        return;
-      }
-
-      botonEsperando(true);
-      // A3: conteo por tanda desde los callbacks (el widget se crea por click,
-      // así que los contadores arrancan en cero solos).
-      var subidas = 0, fallidas = 0;
-
-      var tag = CFG.tagFor(state.slug, state.tipo);   // contrato compartido con el Worker
-      var widget = window.cloudinary.createUploadWidget({
-        cloudName: CFG.CLOUD_NAME,
-        uploadPreset: CFG.UPLOAD_PRESET,
-        folder: CFG.CLOUDINARY_FOLDER,
-        tags: [tag],
-        sources: ['local', 'camera'],
-        multiple: true,
-        maxFiles: 300,
-        // A5: solo imágenes — un .zip o video se rechaza en el picker, no
-        // después de subirlo ('image' es shortcut documentado del widget).
-        clientAllowedFormats: ['image'],
-        language: 'es',
-        text: { es: {
-          or: 'o',
-          menu: { files: 'Mis fotos', camera: 'Cámara' },
-          // A5: errores del widget en español. Claves verificadas contra el
-          // text.json oficial (uploader.errors.*) — no inventar claves acá.
-          uploader: { errors: {
-            allowed_formats: 'Ese archivo no es una imagen. Subí fotos JPG o PNG.',
-            max_number_of_files: 'Son demasiados archivos: hasta 300 por tanda.',
-            max_file_size: 'El archivo es demasiado pesado.',
-            min_file_size: 'El archivo es demasiado chico.',
-            file_too_large: 'El archivo ({{size}}) supera el máximo permitido ({{allowed}}).'
-          } }
-        } }
-      }, function (error, result) {
-        if (error) {
-          fallidas += 1;
-          botonEsperando(false);
-          console.error('[selfie-subir]', error);
-          setEstado('Hubo un problema al subir. Probá de nuevo.', true);
-          return;
-        }
-        if (result && result.event === 'display-changed') {
-          // El widget ya se mostró (o cambió de estado): el botón vuelve solo.
-          botonEsperando(false);
-        }
-        if (result && result.event === 'success') {
-          subidas += 1;
-          setEstado('Subida: ' + (result.info && result.info.original_filename ? result.info.original_filename : 'foto'));
-        }
-        if (result && result.event === 'queues-end') {
-          // A2: la tanda terminó, el widget sobra. quiet: sin confirmación
-          // (la cola ya está vacía, no se aborta nada).
-          widget.close({ quiet: true });
-          // Con 0 y 0 no hay nada que anunciar (queues-end sin archivos).
-          if (subidas + fallidas > 0) mostrarResultado(subidas, fallidas);
-        }
+    // CTA legacy (si el botón "Subir" viejo sigue en la página, abre con el
+    // tipo actual — se borra del Designer sin tocar código).
+    var btn = el('subir-btn');
+    if (btn) {
+      btn.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        abrirSelector(btn);
       });
-      widget.open();
-    });
+    }
   }
 
   function init() {
