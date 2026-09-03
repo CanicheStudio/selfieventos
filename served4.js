@@ -614,13 +614,6 @@
       ocupado(false);
       pintarBoton();
       setEstado('');
-      // El Worker cachea el listado 60 s: se le avisa que esta tanda cambió el
-      // evento para que "Ver álbum" muestre las fotos recién subidas.
-      if (subidas > 0) {
-        fetch(CFG.api('/api/eventos/' + encodeURIComponent(state.slug) + '/refrescar'), {
-          method: 'POST', headers: pinHeaders()
-        }).catch(function () { /* el TTL corto lo cubre */ });
-      }
       mostrarResultado(subidas, fallidas);
     });
   }

@@ -141,27 +141,12 @@
       });
   }
 
-  // El lead se reintenta ante 429 (rate limit en el pico del evento) y ante
-  // fallo de red, hasta 3 veces con la espera que pide el Worker (tope 3 s).
-  // Antes un 429 tiraba el lead en silencio y el invitado entraba igual
-  // (QA 2026-09-02). Sigue sin bloquear: si todo falla, pasa igual.
-  function postLead(email, slug, intento) {
-    intento = intento || 1;
-    function esperar(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
+  function postLead(email, slug) {
     return fetch(CFG.api('/api/leads'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email, evento: slug })
-    }).then(function (r) {
-      if (r.status === 429 && intento < 3) {
-        var seg = parseInt(r.headers.get('Retry-After'), 10);
-        return esperar(Math.min(3000, (seg > 0 ? seg : 1) * 1000)).then(function () { return postLead(email, slug, intento + 1); });
-      }
-      return r.ok;
-    }).catch(function () {
-      if (intento < 3) return esperar(800 * intento).then(function () { return postLead(email, slug, intento + 1); });
-      return false;
-    });
+    }).then(function (r) { return r.ok; });
   }
 
   /* ────────────────────────────── email gate ─────────────────────────────── */
@@ -228,10 +213,7 @@
         input.focus();
         return;
       }
-      var btnGate = form.querySelector('button, input[type="submit"]');
-      if (btnGate) btnGate.disabled = true;   // doble tap = doble lead (QA B7)
       postLead(email, state.slug).then(function (ok) {
-        if (btnGate) btnGate.disabled = false;
         if (!ok) console.warn('[selfie-album] el lead no se registró; dejo pasar igual');
         // El gate es captura de leads, NO barrera de seguridad: si el backend
         // falla, el invitado ve sus fotos igual. Nunca bloquear por tracking.

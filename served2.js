@@ -391,29 +391,7 @@
     set('suelta');
   }
 
-  // Botón "Ver álbum" de la card del evento (pieza de Cani, hook ver-album):
-  // Fer entra al álbum del evento elegido sin subir ni borrar nada. Con
-  // evento: apunta a /album?evento=<slug> en pestaña nueva (no pierde /subir).
-  // Sin evento: oculto. Mismo binding que exito-ver-album (Button Main pone
-  // el attr en el wrapper; el href real va en el <a> interno si lo hay).
-  function actualizarVerAlbum() {
-    var n = el('ver-album');
-    if (!n) return;
-    show(n, !!state.slug);
-    if (!state.slug) return;
-    var destino = '/album?evento=' + encodeURIComponent(state.slug);
-    var link = n.tagName === 'A' ? n : n.querySelector('a');
-    if (link) {
-      link.setAttribute('href', destino);
-      link.setAttribute('target', '_blank');
-      link.setAttribute('rel', 'noopener');
-    } else {
-      n.onclick = function (ev) { ev.preventDefault(); window.open(destino, '_blank', 'noopener'); };
-    }
-  }
-
   function actualizarDestino() {
-    actualizarVerAlbum();
     var n = el('destino');
     if (!n) return;
     // Paso 3 (Section paso-subir, arranca display:none): visible solo con un
@@ -501,36 +479,6 @@
   var LIMITE_TANDA = 300;             // paridad con el tope del widget viejo
   var LIMITE_BYTES = 10 * 1024 * 1024; // paridad con el preset (10 MB)
 
-  // UN solo input de archivos, creado al cargar la página y reutilizado.
-  // Medido en el Chrome de Cani (152 / macOS 26, 2026-09-02): un input
-  // type=file creado y clickeado en el mismo gesto NO abre el diálogo (y
-  // tampoco dispara 'cancel' — queda mudo); el mismo input, si ya existía
-  // en la página antes del click, abre. Comet y Playwright no distinguen,
-  // por eso el bug solo se veía en su Chrome. `pendiente` guarda el contexto
-  // del click en curso (tag y botón) para cuando llegue el 'change'.
-  var inputArchivos = null;
-  var pendiente = null;
-
-  function crearInputArchivos() {
-    var input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.multiple = true;
-    input.tabIndex = -1;
-    input.setAttribute('aria-hidden', 'true');
-    input.style.display = 'none';
-    input.addEventListener('change', function () {
-      var ctx = pendiente;
-      pendiente = null;
-      var todos = Array.prototype.slice.call(input.files || []);
-      input.value = '';   // libera los archivos y permite re-elegir los mismos
-      if (ctx && todos.length) procesarTanda(todos, ctx.tag, ctx.btn);
-    });
-    input.addEventListener('cancel', function () { pendiente = null; });
-    document.body.appendChild(input);
-    return input;
-  }
-
   function subirArchivo(file, tag) {
     var datos = new FormData();
     datos.append('file', file);
@@ -559,14 +507,7 @@
     // tag que ningún álbum pide y se pierden sin que nadie se entere).
     if (!state.slug) { setEstado('Primero elegí el evento.', true); return; }
 
-    if (!inputArchivos) inputArchivos = crearInputArchivos();
-    pendiente = { tag: CFG.tagFor(state.slug, state.tipo), btn: btn };
-    // El click del usuario ES el gesto que el browser exige para abrir el
-    // diálogo — tiene que ser sincrónico, sin promesas en el medio.
-    inputArchivos.click();
-  }
-
-  function procesarTanda(todos, tag, btn) {
+    var tag = CFG.tagFor(state.slug, state.tipo);
     var btnTexto = nodoTexto(btn);
     var textoOriginal = btnTexto ? btnTexto.textContent : '';
     function pintarBoton(msg) { if (btnTexto) btnTexto.textContent = msg || textoOriginal; }
@@ -579,55 +520,65 @@
       else real.removeAttribute('disabled');
     }
 
-    if (todos.length > LIMITE_TANDA) {
-      setEstado('Son demasiados archivos: hasta ' + LIMITE_TANDA + ' por tanda.', true);
-      return;
-    }
-    var fallidas = 0;
-    var lote = todos.filter(function (f) {
-      // A5: solo imágenes y tope de peso — se rechaza ANTES de subir.
-      if (f.type.indexOf('image/') !== 0 || f.size > LIMITE_BYTES) { fallidas += 1; return false; }
-      return true;
-    });
+    // Input nativo, uno por click (el click del usuario ES el gesto que el
+    // browser exige para abrir el diálogo — tiene que ser sincrónico).
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true;
+    input.style.display = 'none';
+    document.body.appendChild(input);
 
-    ocupado(true);
-    var subidas = 0, hechas = 0, total = lote.length;
-    function progreso() {
-      pintarBoton('Subiendo ' + hechas + '/' + total + '…');
-    }
-    progreso();
-    setEstado('Subiendo ' + total + (total === 1 ? ' foto' : ' fotos') + ' a ' + nombreEvento() + '…');
+    // Si Fer cancela el dialogo, el input no debe quedar tirado en el body.
+    input.addEventListener('cancel', function () { if (input.parentNode) input.parentNode.removeChild(input); });
+    input.addEventListener('change', function () {
+      var todos = Array.prototype.slice.call(input.files || []);
+      if (input.parentNode) input.parentNode.removeChild(input);
+      if (!todos.length) return;
 
-    // De a 3 en paralelo: rápido sin ahogar la señal del celular de Fer.
-    var i = 0;
-    function siguiente() {
-      if (i >= lote.length) return Promise.resolve();
-      var f = lote[i]; i += 1;
-      return subirArchivo(f, tag).then(function (ok) {
-        if (ok) subidas += 1; else fallidas += 1;
-        hechas += 1;
-        progreso();
-        return siguiente();
-      });
-    }
-    Promise.all([siguiente(), siguiente(), siguiente()]).then(function () {
-      ocupado(false);
-      pintarBoton();
-      setEstado('');
-      // El Worker cachea el listado 60 s: se le avisa que esta tanda cambió el
-      // evento para que "Ver álbum" muestre las fotos recién subidas.
-      if (subidas > 0) {
-        fetch(CFG.api('/api/eventos/' + encodeURIComponent(state.slug) + '/refrescar'), {
-          method: 'POST', headers: pinHeaders()
-        }).catch(function () { /* el TTL corto lo cubre */ });
+      if (todos.length > LIMITE_TANDA) {
+        setEstado('Son demasiados archivos: hasta ' + LIMITE_TANDA + ' por tanda.', true);
+        return;
       }
-      mostrarResultado(subidas, fallidas);
+      var fallidas = 0;
+      var lote = todos.filter(function (f) {
+        // A5: solo imágenes y tope de peso — se rechaza ANTES de subir.
+        if (f.type.indexOf('image/') !== 0 || f.size > LIMITE_BYTES) { fallidas += 1; return false; }
+        return true;
+      });
+
+      ocupado(true);
+      var subidas = 0, hechas = 0, total = lote.length;
+      function progreso() {
+        pintarBoton('Subiendo ' + hechas + '/' + total + '…');
+      }
+      progreso();
+      setEstado('Subiendo ' + total + (total === 1 ? ' foto' : ' fotos') + ' a ' + nombreEvento() + '…');
+
+      // De a 3 en paralelo: rápido sin ahogar la señal del celular de Fer.
+      var i = 0;
+      function siguiente() {
+        if (i >= lote.length) return Promise.resolve();
+        var f = lote[i]; i += 1;
+        return subirArchivo(f, tag).then(function (ok) {
+          if (ok) subidas += 1; else fallidas += 1;
+          hechas += 1;
+          progreso();
+          return siguiente();
+        });
+      }
+      Promise.all([siguiente(), siguiente(), siguiente()]).then(function () {
+        ocupado(false);
+        pintarBoton();
+        setEstado('');
+        mostrarResultado(subidas, fallidas);
+      });
     });
+
+    input.click();
   }
 
   function initUpload() {
-    // El input de archivos nace ACÁ, al cargar, no en el click (ver crearInputArchivos).
-    inputArchivos = crearInputArchivos();
     vigilarCierre(el('exito'));
 
     // "Subir más" promete acción (Cani 2026-09-02): cierra el modal de éxito

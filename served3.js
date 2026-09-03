@@ -391,29 +391,7 @@
     set('suelta');
   }
 
-  // Botón "Ver álbum" de la card del evento (pieza de Cani, hook ver-album):
-  // Fer entra al álbum del evento elegido sin subir ni borrar nada. Con
-  // evento: apunta a /album?evento=<slug> en pestaña nueva (no pierde /subir).
-  // Sin evento: oculto. Mismo binding que exito-ver-album (Button Main pone
-  // el attr en el wrapper; el href real va en el <a> interno si lo hay).
-  function actualizarVerAlbum() {
-    var n = el('ver-album');
-    if (!n) return;
-    show(n, !!state.slug);
-    if (!state.slug) return;
-    var destino = '/album?evento=' + encodeURIComponent(state.slug);
-    var link = n.tagName === 'A' ? n : n.querySelector('a');
-    if (link) {
-      link.setAttribute('href', destino);
-      link.setAttribute('target', '_blank');
-      link.setAttribute('rel', 'noopener');
-    } else {
-      n.onclick = function (ev) { ev.preventDefault(); window.open(destino, '_blank', 'noopener'); };
-    }
-  }
-
   function actualizarDestino() {
-    actualizarVerAlbum();
     var n = el('destino');
     if (!n) return;
     // Paso 3 (Section paso-subir, arranca display:none): visible solo con un
@@ -614,13 +592,6 @@
       ocupado(false);
       pintarBoton();
       setEstado('');
-      // El Worker cachea el listado 60 s: se le avisa que esta tanda cambió el
-      // evento para que "Ver álbum" muestre las fotos recién subidas.
-      if (subidas > 0) {
-        fetch(CFG.api('/api/eventos/' + encodeURIComponent(state.slug) + '/refrescar'), {
-          method: 'POST', headers: pinHeaders()
-        }).catch(function () { /* el TTL corto lo cubre */ });
-      }
       mostrarResultado(subidas, fallidas);
     });
   }
